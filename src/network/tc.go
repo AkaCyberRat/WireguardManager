@@ -11,25 +11,18 @@ import (
 )
 
 func TcConfigure() error {
-	var err error
-
 	//
-	//Add tc base rules to limit client download bandwidth (server upload)
+	//Add tc base rule to limit client download bandwidth (server upload)
 	//
-	err = Execute(time.Second, "tc", "qdisc", "add", "dev", "wg0", "root", "handle", "1:", "htb")
-	if err != nil {
-		return err
-	}
-
-	err = Execute(time.Second, "tc", "class", "add", "dev", "wg0", "parent", "1:", "classid", "1:1", "htb", "rate", "5mbit", "ceil", "5mbit")
+	err := execute("tc", "qdisc", "add", "dev", "wg0", "root", "handle", "1:", "htb")
 	if err != nil {
 		return err
 	}
 
 	//
-	//Add tc rules to limit client upload bandwidth (server download)
+	//Add tc base rule to limit client upload bandwidth (server download)
 	//
-	err = Execute(time.Second, "tc", "qdisc", "add", "dev", "wg0", "ingress")
+	err = execute("tc", "qdisc", "add", "dev", "wg0", "ingress")
 	if err != nil {
 		return err
 	}
@@ -37,96 +30,82 @@ func TcConfigure() error {
 	return nil
 }
 
-func TcAddRules(ipNet string, downloadSpeed int, uploadSpeed int, prio int, classId int) error {
-	var err error
-
-	downloadRate := strconv.FormatInt(int64(downloadSpeed), 10) + "mbit"
-	//uploadRate := strconv.FormatInt(int64(uploadSpeed), 10) + "mbit"
-	classIdValue := "1:" + strconv.FormatInt(int64(classId), 10)
-	prioValue := strconv.FormatInt(int64(prio), 10)
+func TcAddRules(ipNet string, downloadSpeed int, uploadSpeed int, id int) error {
+	_downloadSpeed := strconv.FormatInt(int64(downloadSpeed), 10) + "mbit"
+	_uploadSpeed := strconv.FormatInt(int64(uploadSpeed), 10) + "mbit"
+	prio := strconv.FormatInt(int64(id), 10)
+	classId := "1:" + strconv.FormatInt(int64(id), 10)
 
 	//
-	//Add tc base rules to limit client download bandwidth (server upload)
+	// Limit download bandwidth
 	//
-	err = Execute(time.Second, "tc", "class", "add", "dev", "wg0", "parent", "1:1", "classid", classIdValue, "htb", "rate", "4mbit", "ceil", downloadRate)
+	err := execute("tc", "class", "add", "dev", "wg0", "parent", "1:", "classid", classId, "htb", "rate", "2mbit", "ceil", _downloadSpeed)
 	if err != nil {
 		return err
 	}
 
-	err = Execute(time.Second, "tc", "filter", "add", "dev", "wg0", "protocol", "ip", "parent", "1:", "prio", prioValue, "u32", "match", "ip", "src", ipNet, "flowid", classIdValue)
+	err = execute("tc", "filter", "add", "dev", "wg0", "protocol", "ip", "parent", "1:", "prio", prio, "u32", "match", "ip", "src", ipNet, "flowid", classId)
 	if err != nil {
 		return err
 	}
 
-	err = Execute(time.Second, "tc", "filter", "add", "dev", "wg0", "protocol", "ip", "parent", "1:", "prio", prioValue, "u32", "match", "ip", "dst", ipNet, "flowid", classIdValue)
+	err = execute("tc", "filter", "add", "dev", "wg0", "protocol", "ip", "parent", "1:", "prio", prio, "u32", "match", "ip", "dst", ipNet, "flowid", classId)
 	if err != nil {
 		return err
 	}
 
 	//
-	//Add tc rules to limit client upload bandwidth (server download)
+	// Limit upload bandwidth
 	//
-	err = Execute(time.Second, "tc", "filter", "add", "dev", "wg0", "protocol", "ip", "ingress", "prio", prioValue, "u32", "match", "ip", "src", ipNet, "action", "police", "rate", uploadRate, "burst", uploadRate)
+	err = execute("tc", "filter", "add", "dev", "wg0", "protocol", "ip", "ingress", "prio", prio, "u32", "match", "ip", "src", ipNet, "action", "police", "rate", _uploadSpeed, "burst", "5mbit")
 	if err != nil {
 		return err
 	}
 
-	err = Execute(time.Second, "tc", "filter", "add", "dev", "wg0", "protocol", "ip", "ingress", "prio", prioValue, "u32", "match", "ip", "dst", ipNet, "action", "police", "rate", uploadRate, "burst", uploadRate)
+	err = execute("tc", "filter", "add", "dev", "wg0", "protocol", "ip", "ingress", "prio", prio, "u32", "match", "ip", "dst", ipNet, "action", "police", "rate", _uploadSpeed, "burst", "5mbit")
 	if err != nil {
 		return err
 	}
-
-	// err = Execute(time.Second, "tc", "filter", "add", "dev", "wg0", "protocol", "ip", "ingress", "prio", prioValue, "u32", "match", "ip", "src", ipNet, "flowid", classIdValue)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// err = Execute(time.Second, "tc", "filter", "add", "dev", "wg0", "protocol", "ip", "ingress", "prio", prioValue, "u32", "match", "ip", "dst", ipNet, "flowid", classIdValue)
-	// if err != nil {
-	// 	return err
-	// }
 
 	return nil
 }
 
-// func TcDelRules(ipNet string, downloadSpeed int, uploadSpeed int, prio int, classId int) error {
-// 	var err error
+func TcDelRules(id int) error {
+	prio := strconv.FormatInt(int64(id), 10)
+	classId := "1:" + strconv.FormatInt(int64(id), 10)
 
-// 	downloadRate := strconv.FormatInt(int64(downloadSpeed), 10) + "mbit"
-// 	uploadRate := strconv.FormatInt(int64(uploadSpeed), 10) + "mbit"
-// 	classIdValue := "1:" + strconv.FormatInt(int64(classId), 10)
-// 	prioValue := strconv.FormatInt(int64(prio), 10)
+	err := execute("tc", "filter", "del", "dev", "wg0", "parent", classId, "prio", prio)
+	if err != nil {
+		return err
+	}
 
-// 	err = execute(time.Second, )
+	err = execute("tc", "filter", "del", "dev", "wg0", "ingress", "prio", prio)
+	if err != nil {
+		return err
+	}
 
-// }
+	err = execute("tc", "class", "del", "dev", "wg0", "parent", classId)
+	if err != nil {
+		return err
+	}
 
-func Execute(duration time.Duration, name string, args ...string) (err error) {
+	return nil
+}
+
+func execute(name string, args ...string) (err error) {
 	stdOut := &bytes.Buffer{}
 	stdErr := &bytes.Buffer{}
 
-	var cmd *exec.Cmd
-	if duration == 0 {
-		cmd = exec.Command(name, args...)
-	} else {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		defer cancel()
-		cmd = exec.CommandContext(ctx, name, args...)
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
 
+	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Stdout = stdOut
 	cmd.Stderr = stdErr
 
 	err = cmd.Run()
 	if err != nil {
-
-		stdErrStr := stdErr.String()
-		if len(stdErrStr) > 0 {
-			logrus.Errorf("Command: '%v' HandledError: '%v' ErrorOut: '%v'", cmd.String(), err.Error(), stdErr.String())
-		} else {
-			logrus.Errorf("Command: '%v' HandledError: '%v'", cmd.String(), err.Error())
-		}
-
+		logrus.Errorf("Command: '%v' Error: '%v' '%v'", cmd.String(), err.Error(), stdErr.String())
 		return err
 	}
 
