@@ -1,0 +1,12 @@
+version: '3'
+
+services:
+
+  dev_wg_control:
+    build: .
+    container_name: dev_wg_control
+    ports:
+    - "51830:51830/udp"
+    cap_add:
+    - NET_ADMIN
+    - SYS_MODULE
