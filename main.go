@@ -1,59 +1,57 @@
 package main
 
 import (
-	"net"
-
+	"WireguardManager/src/api"
+	"WireguardManager/src/config"
+	"WireguardManager/src/db"
+	"WireguardManager/src/db/models"
 	"WireguardManager/src/logging"
-	"WireguardManager/src/network"
+	"WireguardManager/src/services/vpn"
 
 	"github.com/sirupsen/logrus"
-	"golang.zx2c4.com/wireguard/wgctrl"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
 func main() {
+	logging.TempConfig()
+	config.Load()
 
 	logging.Configure()
-	network.Configure()
+	db.Configure()
+	vpn.Configure()
+	api.Configure()
 
-	err := network.TcConfigure()
-	if err != nil {
-		logrus.Fatal("Cant configure tc tool: ", err.Error())
-	}
+	GeneratePeers()
 
-	for i := 0; i < 1; i++ {
-		err = network.TcAddRules("10.1.1.2/32", 10, 10, 1)
-		if err != nil {
-			logrus.Fatal("Cant configure tc tool: ", err.Error())
-		}
-	}
-
-	select {}
+	api.Run()
 }
 
-func GeneratePeers(client *wgctrl.Client) *[]wgtypes.PeerConfig {
+func GeneratePeers() {
+	GeneratePeer(1, "uKIkAl5agqGLoodeDAdtgZHh91vXck5z/mmxETx2dWs=")
 
-	prKey, _ := wgtypes.ParseKey("uKIkAl5agqGLoodeDAdtgZHh91vXck5z/mmxETx2dWs=")
-	pubKey := prKey.PublicKey()
-	ipAddress := "10.1.1.2/32"
+	pk, _ := wgtypes.GeneratePrivateKey()
+	GeneratePeer(2, pk.String())
+}
+
+func GeneratePeer(index int, publicKey string) {
+
+	prKey, _ := wgtypes.ParseKey(publicKey)
+
+	peer, err := vpn.GetPeerById(index)
+	if err != nil {
+		logrus.Fatal("Failed to set peer: ", err)
+	}
+
+	peer.PublicKey = prKey.PublicKey().String()
+	peer.PresharedKey = ""
+	peer.DownloadSpeed = 10
+	peer.UploadSpeed = 10
+	peer.Status = models.Enabled
 
 	logrus.Infof("Client pk: %v", prKey.String())
 	logrus.Infof("Client pubk: %v", prKey.PublicKey().String())
+	logrus.Infof("Client ip: %v", peer.IpAddress)
+	logrus.Infof("Client status: %v", peer.Status)
 
-	var ipAddresses []net.IPNet
-	_, ipnet, err := net.ParseCIDR(ipAddress)
-	if err != nil {
-		logrus.Fatal("Cant parse ip net address for peer")
-	}
-	ipAddresses = append(ipAddresses, *ipnet)
-
-	peer := wgtypes.PeerConfig{
-		PublicKey:  pubKey,
-		AllowedIPs: ipAddresses,
-	}
-
-	var peers []wgtypes.PeerConfig
-	peers = append(peers, peer)
-
-	return &peers
+	vpn.UpdatePeer(peer)
 }
