@@ -1,4 +1,3 @@
-
 FROM golang:buster
 
 RUN \ 
@@ -20,13 +19,13 @@ echo "**** clean up ****" && \
 rm -rf /tmp/* /var/lib/apt/lists/* /var/tmp/*
 
 WORKDIR /app
-COPY . /app/src
+COPY . /src
 
 RUN \
- mv /app/src/additional /app/additional &&\
- mv /app/additional/coredns.service /etc/systemd/system/ &&\
+ mv /src/additional /app/additional &&\
+ mv /src/additional/coredns.service /etc/systemd/system/ &&\
  systemctl daemon-reload &&\
- chmod 777 additional/SetupIptableAndRunApp.sh &&\
+ chmod 777 additional/run.sh &&\
  cd /app/src &&\
  go build -o /app/main main.go 
 

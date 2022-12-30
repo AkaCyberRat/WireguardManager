@@ -3,10 +3,16 @@ version: '3'
 services:
   dev_wg_control:
     build: .
-    container_name: wg_control
+
+    container_name: wireguard_manager
+    
     ports:
-    - "51830:51830/udp"
-    - "5000:5000"
+      - "51830:51830/udp"
+      - "5001:5001"
+    
+    env_file:
+      - .env.example
+
     cap_add:
-    - NET_ADMIN
-    - SYS_MODULE
+      - NET_ADMIN
+      - SYS_MODULE
