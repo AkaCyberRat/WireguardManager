@@ -12,6 +12,7 @@ import (
 type Deps struct {
 	ConsoleLogLevel string
 	FileLogLevel    string
+	FilePath        string
 }
 
 func TempConfig() {
@@ -52,12 +53,11 @@ func Configure(deps Deps) error {
 	//
 	// Prepare file writer for file logging.
 	//
-
-	if err = os.MkdirAll("/app/log/", 0777); err != nil {
+	if err = os.MkdirAll(deps.FilePath, 0777); err != nil {
 		return fmt.Errorf("failed to create log dir: %v", err.Error())
 	}
 
-	fileWriter, err := os.OpenFile("/app/log/logs.txt", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0777)
+	fileWriter, err := os.OpenFile(deps.FilePath+"logs.txt", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0777)
 	if err != nil {
 		return fmt.Errorf("failed to open/create log file: %v", err.Error())
 	}

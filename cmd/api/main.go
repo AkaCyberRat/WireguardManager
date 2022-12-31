@@ -37,14 +37,15 @@ func main() {
 	// Reconfigure logging using new configuration
 	//
 	logging.Configure(logging.Deps{
-		ConsoleLogLevel: conf.LogLevelConsole,
-		FileLogLevel:    conf.LogLevelFile,
+		ConsoleLogLevel: conf.LoggingConsoleLevel,
+		FileLogLevel:    conf.LoggingFileLevel,
+		FilePath:        conf.LoggingFilePath,
 	})
 
 	//
 	// Open database
 	//
-	db, err := gorm.Open(sqlite.Open("/app/db/service.db"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(conf.DataBasePath), &gorm.Config{})
 	if err != nil {
 		logrus.Fatal("Db err: %s", err.Error())
 	}
@@ -53,7 +54,7 @@ func main() {
 	// Create and initialize (if need) repositories
 	//
 	repositories, err := storage.NewRepositories(db).Init(storage.InitDeps{
-		PeerCount: conf.WgPeerLimit,
+		PeerCount: conf.WireguardPeerLimit,
 	})
 	if err != nil {
 		logrus.Fatal("Repository err: ", err.Error())
@@ -66,7 +67,7 @@ func main() {
 		WireguardInterface: "wg0",
 		WireguardIpNet:     "10.0.0.0/8",
 		PrivateKey:         "uKIkAl5agqGLoodeDAdtgZHh91vXck5z/mmxETx2dWs=",
-		Port:               conf.WgPort,
+		Port:               conf.WireguardPort,
 		UseTC:              true,
 	})
 	if err != nil {
