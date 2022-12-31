@@ -29,33 +29,49 @@ func TempConfig() {
 
 func Configure(deps Deps) error {
 
-	consoleLogLevel, err := logrus.ParseLevel(deps.ConsoleLogLevel)
+	//
+	// Set minimum level, then below override
+	// levels for every log output. And remove standart output.
+	//
+	logrus.SetLevel(logrus.TraceLevel)
+	logrus.SetOutput(io.Discard)
+
+	//
+	// Parse log levels from deps.
+	//
+	consLogLevel, err := logrus.ParseLevel(deps.ConsoleLogLevel)
 	if err != nil {
-		return fmt.Errorf("failed to parse console log level from config: %v", err.Error())
+		return fmt.Errorf("failed to parse console log level: %v", err.Error())
 	}
 
 	fileLogLevel, err := logrus.ParseLevel(deps.FileLogLevel)
 	if err != nil {
-		return fmt.Errorf("failed to parse file log level from config: %v", err.Error())
+		return fmt.Errorf("failed to parse file log level: %v", err.Error())
 	}
 
-	err = os.MkdirAll("/app/log/", 0777)
-	if err != nil {
+	//
+	// Prepare file writer for file logging.
+	//
+
+	if err = os.MkdirAll("/app/log/", 0777); err != nil {
 		return fmt.Errorf("failed to create log dir: %v", err.Error())
 	}
 
-	logFile, err := os.OpenFile("/app/log/logs.txt", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0777)
+	fileWriter, err := os.OpenFile("/app/log/logs.txt", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0777)
 	if err != nil {
 		return fmt.Errorf("failed to open/create log file: %v", err.Error())
 	}
 
-	logrus.SetOutput(io.Discard)
+	//
+	// Add self-written console and file outputs
+	//
 	logrus.AddHook(&writerHook{
 		Writer:      os.Stdout,
-		MinLogLevel: consoleLogLevel,
+		MinLogLevel: consLogLevel,
 	})
+
 	logrus.AddHook(&writerHook{
-		Writer:      logFile,
+		Writer:      fileWriter,
 		MinLogLevel: fileLogLevel,
 	})
 
