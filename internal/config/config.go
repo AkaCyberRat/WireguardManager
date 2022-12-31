@@ -2,68 +2,106 @@ package config
 
 import (
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/knadh/koanf"
+	"github.com/knadh/koanf/parsers/json"
+	"github.com/knadh/koanf/providers/confmap"
+	"github.com/knadh/koanf/providers/env"
+	"github.com/knadh/koanf/providers/file"
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 )
 
 func NewConfig() (*Config, error) {
-	configViper := viper.New()
+	//
+	// Create koanf configurator instanse
+	//
+	k := koanf.New(".")
 
-	// Set defaults
-	configViper.SetDefault("SERVER_IP", "127.0.0.1")
-	configViper.SetDefault("WG_PORT", 51820)
-	configViper.SetDefault("API_PORT", 5000)
-	configViper.SetDefault("PEER_LIMIT", 100)
-	configViper.SetDefault("INTERFACE", "eth0")
-	configViper.SetDefault("USE_TC", true)
-	configViper.SetDefault("USE_SSL", false)
-	configViper.SetDefault("FILE_LOGLEVEL", "debug")
-	configViper.SetDefault("CONSOLE_LOGLEVEL", "warning")
+	//
+	// (First config layer) Set default values
+	//
+	err := k.Load(confmap.Provider(map[string]interface{}{
+		"Host.Ip":           "127.0.0.1",
+		"Host.NetInterface": "eth0",
 
-	// Read user config
-	configViper.AddConfigPath("/app")
-	configViper.SetConfigName("config")
-	configViper.SetConfigType("json")
-	configViper.AutomaticEnv()
+		"Wireguard.Port":      51820,
+		"Wireguard.PeerLimit": 100,
 
-	err := configViper.ReadInConfig()
-	if err == nil {
-		logrus.Info("Config was read")
-	} else if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-		logrus.Info("Config was not found and skipped. (Used default settings)")
-	} else {
-		return nil, fmt.Errorf("failed to read config: %v", err.Error())
+		"Api.Port":  5000,
+		"Api.UseTC": true,
+
+		"DataBase.Path": "/app/db/service.db",
+
+		"Logging.FilePath":     "/app/logs/",
+		"Logging.ConsoleLevel": "info",
+		"Logging.FileLevel":    "error",
+	}, "."), nil)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to load default configuration: %v", err.Error())
 	}
 
-	// Read dev config
-	configViper.AddConfigPath("/app")
-	configViper.SetConfigName("config-dev")
-	configViper.SetConfigType("json")
-
-	err = configViper.MergeInConfig()
+	//
+	// (Second config layer) Load config.json
+	//
+	err = k.Load(file.Provider("/app/configs/config.json"), json.Parser())
 	if err == nil {
-		logrus.Warn("Dev config was read")
-	} else if _, ok := err.(viper.ConfigFileNotFoundError); ok { // Check if file exist and reading failed
-		logrus.Debug("Dev config not used")
+		logrus.Info("User configuration has been read.")
+
+	} else if os.IsNotExist(err) {
+		logrus.Warn("User configuration file wasn't found. (Default settings applied)")
+
 	} else {
-		return nil, fmt.Errorf("failed to read dev config: %v", err.Error())
+		return nil, fmt.Errorf("failed to read user configuration file: %v", err.Error())
 	}
 
-	// Unmarshal config
-	config := Config{}
-	err = configViper.Unmarshal(&config)
+	//
+	// (Third config layer) Load development config.json.dev
+	//
+	err = k.Load(file.Provider("/app/configs/config.json.dev"), json.Parser())
+	if err == nil {
+		logrus.Warn("Development configuraton has been read.")
+
+	} else if os.IsNotExist(err) { // Check if file exist and reading failed
+		logrus.Debug("User configuration file wasn't found.")
+
+	} else {
+		return nil, fmt.Errorf("failed to read development configuration file: %v", err.Error())
+	}
+
+	//
+	// (Fourth config layer) Load environment variables
+	//
+	err = k.Load(env.Provider("APP_", ".", convertEnvVarName), nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load environment variables: %v", err.Error())
+	}
+
+	//
+	// Unmarshal data from configurator to struct
+	//
+	var config Config
+	err = k.UnmarshalWithConf("", &config, koanf.UnmarshalConf{Tag: "koanf", FlatPaths: true})
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %v", err.Error())
 	}
 
+	//
 	// Validate config
-	validate := validator.New()
-	err = validate.Struct(config)
+	//
+	err = validator.New().Struct(config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to validate config: %v", err.Error())
+		return nil, fmt.Errorf("config validation failed: %v", err.Error())
 	}
 
 	return &config, nil
+}
+
+func convertEnvVarName(s string) string {
+
+	return strings.Replace(
+		strings.TrimPrefix(s, "APP_"), "_", ".", -1)
 }

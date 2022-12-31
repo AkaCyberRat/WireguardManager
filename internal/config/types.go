@@ -1,16 +1,20 @@
 package config
 
 type Config struct {
-	ServerIP          string `mapstructure:"SERVER_IP" validate:"required,ipv4"`
-	WgPort            int    `mapstructure:"WG_PORT" validate:"required,min=1,max=65535"`
-	WgPeerLimit       int    `mapstructure:"PEER_LIMIT" validate:"required,min=1,max=65535"`
-	ApiPort           int    `mapstructure:"API_PORT" validate:"required,min=1,max=65535"`
-	Interface         string `mapstructure:"INTERFACE" validate:"required,min=1,max=15"`
-	UseSSL            bool   `mapstructure:"USE_SSL"`
-	UseTrafficControl bool   `mapstructure:"USE_TRAFFIC_CONTROL"`
-	UseTestConfig     bool   `mapstructure:"USE_TESTING_CONFIG"`
-	LogLevelFile      string `mapstructure:"FILE_LOGLEVEL" validate:"required"`
-	LogLevelConsole   string `mapstructure:"CONSOLE_LOGLEVEL" validate:"required"`
+	HostIp           string `koanf:"Host.Ip" validate:"required,ipv4"`
+	HostNetInterface string `koanf:"Host.NetInterface" validate:"required,min=1,max=15"`
+
+	WireguardPort      int `koanf:"Wireguard.Port" validate:"required,min=1,max=65535"`
+	WireguardPeerLimit int `koanf:"Wireguard.PeerLimit" validate:"required,min=1,max=65535"`
+
+	ApiPort  int  `koanf:"Api.Port" validate:"required,min=1,max=65535"`
+	ApiUseTC bool `koanf:"Api.UseTC"`
+
+	DataBasePath string `koanf:"DataBase.Path" validate:"required"`
+
+	LoggingFilePath     string `koanf:"Logging.Path" validate:"required"`
+	LoggingFileLevel    string `koanf:"Logging.ConsoleLevel" validate:"required"`
+	LoggingConsoleLevel string `koanf:"Logging.FileLevel" validate:"required"`
 }
 
 type TestingConfig struct {
