@@ -1,26 +1,59 @@
 package config
 
-type Config struct {
-	HostIp           string `koanf:"Host.Ip" validate:"required,ipv4"`
-	HostNetInterface string `koanf:"Host.NetInterface" validate:"required,min=1,max=15"`
+import "WireguardManager/internal/core"
 
-	WireguardPort      int `koanf:"Wireguard.Port" validate:"required,min=1,max=65535"`
-	WireguardPeerLimit int `koanf:"Wireguard.PeerLimit" validate:"required,min=1,max=65535"`
-
-	ApiPort  int  `koanf:"Api.Port" validate:"required,min=1,max=65535"`
-	ApiUseTC bool `koanf:"Api.UseTC"`
-
-	DataBasePath string `koanf:"DataBase.Path" validate:"required"`
-
-	LoggingFilePath     string `koanf:"Logging.Path" validate:"required"`
-	LoggingFileLevel    string `koanf:"Logging.ConsoleLevel" validate:"required"`
-	LoggingConsoleLevel string `koanf:"Logging.FileLevel" validate:"required"`
+// Config root
+type Configuration struct {
+	App     AppConf
+	Develop DevelopConf
 }
 
-type TestingConfig struct {
-	WgPrivateKey           string `mapstructure:"WG_PRIVATE_KEY" validate:"required,base64"`
-	FirstPeerPublicKey     string `mapstructure:"FIRST_PEER_PUBLIC_KEY" validate:"required,base64"`
-	FirstPeerPresharedKey  string `mapstructure:"FIRST_PEER_PRESHARED_KEY" validate:"required,base64"`
-	FirstPeerDownloadSpeed int    `mapstructure:"FIRST_PEER_DOWNLOAD_SPEED" validate:"required,min=1,max=200"`
-	FirstPeerUploadSpeed   int    `mapstructure:"FIRST_PEER_UPLOAD_SPEED" validate:"required,min=1,max=200"`
+// App config
+type AppConf struct {
+	LaunchMode LaunchMode `koanf:"launchmode" validate:"required,oneof=default develop"`
+
+	Host struct {
+		Ip           string `koanf:"ip" validate:"required,ipv4"`
+		NetInterface string `koanf:"netinterface" validate:"required,min=1,max=15"`
+	} `koanf:"host" validate:"required"`
+
+	Wireguard struct {
+		Port      int `koanf:"port" validate:"required,min=1,max=65535"`
+		PeerLimit int `koanf:"peerlimit" validate:"required,min=1,max=65535"`
+	} `koanf:"wireguard" validate:"required"`
+
+	RestApi struct {
+		Port int `koanf:"port" validate:"required,min=1,max=65535"`
+	} `koanf:"restapi" validate:"required"`
+
+	Database struct {
+		Path string `koanf:"path" validate:"required"`
+	} `koanf:"database" validate:"required"`
+
+	Logging struct {
+		FolderPath   string `koanf:"folderpath" validate:"required"`
+		FileLevel    string `koanf:"filelevel" validate:"required"`
+		ConsoleLevel string `koanf:"consolelevel" validate:"required"`
+	} `koanf:"logging" validate:"required"`
+}
+
+type LaunchMode string
+
+const (
+	Develop LaunchMode = "develop"
+	Default LaunchMode = "default"
+)
+
+// Dev configurationyy
+type DevelopConf struct {
+	Services struct {
+		Server struct {
+			Privatekey string `koanf:"privatekey" validate:"required,base64"`
+			Port       int    `koanf:"privatekey" validate:"required,min=1,max=65535"`
+		} `koanf:"server" validate:"required"`
+
+		Peer struct {
+			ToCreate []core.CreatePeer `koanf:"peers" validete:"omitempty,dive"`
+		}
+	}
 }

@@ -14,30 +14,32 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func NewConfig() (*Config, error) {
+func NewConfig() (*Configuration, error) {
 	//
-	// Create koanf configurator instanse
+	// Create configurator instanse
 	//
-	k := koanf.New(".")
+	configurator := koanf.New(".")
 
 	//
-	// (First config layer) Set default values
+	// (First layer) Set default values
 	//
-	err := k.Load(confmap.Provider(map[string]interface{}{
-		"Host.Ip":           "127.0.0.1",
-		"Host.NetInterface": "eth0",
+	err := configurator.Load(confmap.Provider(map[string]interface{}{
+		"app.launchmode": "default",
 
-		"Wireguard.Port":      51820,
-		"Wireguard.PeerLimit": 100,
+		"app.host.ip":           "127.0.0.1",
+		"app.host.netinterface": "eth0",
 
-		"Api.Port":  5000,
-		"Api.UseTC": true,
+		"app.wireguard.port":      51820,
+		"app.wireguard.peerlimit": 100,
 
-		"DataBase.Path": "/app/db/service.db",
+		"app.api.port":  5000,
+		"app.api.usetc": true,
 
-		"Logging.FilePath":     "/app/logs/",
-		"Logging.ConsoleLevel": "info",
-		"Logging.FileLevel":    "error",
+		"app.dataBase.path": "/app/db/service.db",
+
+		"app.logging.folderpath":   "/app/logs/",
+		"app.logging.consolelevel": "info",
+		"app.logging.filelevel":    "error",
 	}, "."), nil)
 
 	if err != nil {
@@ -45,9 +47,9 @@ func NewConfig() (*Config, error) {
 	}
 
 	//
-	// (Second config layer) Load config.json
+	// (Second layer) Load config.json
 	//
-	err = k.Load(file.Provider("/app/configs/config.json"), json.Parser())
+	err = configurator.Load(file.Provider("/app/configs/config.json"), json.Parser())
 	if err == nil {
 		logrus.Info("User configuration has been read.")
 
@@ -59,45 +61,64 @@ func NewConfig() (*Config, error) {
 	}
 
 	//
-	// (Third config layer) Load development config.json.dev
+	// (Third layer) Load environment variables
 	//
-	err = k.Load(file.Provider("/app/configs/config.json.dev"), json.Parser())
-	if err == nil {
-		logrus.Warn("Development configuraton has been read.")
-
-	} else if os.IsNotExist(err) { // Check if file exist and reading failed
-		logrus.Debug("User configuration file wasn't found.")
-
-	} else {
-		return nil, fmt.Errorf("failed to read development configuration file: %v", err.Error())
-	}
-
-	//
-	// (Fourth config layer) Load environment variables
-	//
-	err = k.Load(env.Provider("APP_", ".", convertEnvVarName), nil)
+	err = configurator.Load(env.Provider("APP_", ".", convertEnvVarName), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load environment variables: %v", err.Error())
 	}
 
 	//
-	// Unmarshal data from configurator to struct
+	// Unmarshal app config
 	//
-	var config Config
-	err = k.UnmarshalWithConf("", &config, koanf.UnmarshalConf{Tag: "koanf", FlatPaths: true})
+	var config Configuration
+	err = configurator.Unmarshal("app", &config.App)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %v", err.Error())
 	}
 
 	//
-	// Validate config
+	// Validate app config
 	//
-	err = validator.New().Struct(config)
+	err = validator.New().Struct(config.App)
 	if err != nil {
 		return nil, fmt.Errorf("config validation failed: %v", err.Error())
 	}
 
+	//
+	// Load dev conig if 'develop' launch mode
+	//
+	if config.App.LaunchMode == Develop {
+		config.Develop, err = loadDevConfig()
+		return &config, err
+	}
+
 	return &config, nil
+}
+
+func loadDevConfig() (DevelopConf, error) {
+	var devConf DevelopConf
+
+	k := koanf.New(".")
+
+	err := k.Load(file.Provider("/app/configs/config.json.dev"), json.Parser())
+	if err != nil {
+		return DevelopConf{}, fmt.Errorf("failed to read dev config file: %v", err.Error())
+	}
+
+	logrus.Warn("Development configuraton has been read.")
+
+	err = k.Unmarshal("dev", &devConf)
+	if err != nil {
+		return DevelopConf{}, fmt.Errorf("failed to unmarshal dev config: %v", err.Error())
+	}
+
+	err = validator.New().Struct(devConf)
+	if err != nil {
+		return DevelopConf{}, fmt.Errorf("dev config validation failed: %v", err.Error())
+	}
+
+	return devConf, nil
 }
 
 func convertEnvVarName(s string) string {
