@@ -23,7 +23,8 @@ type AppConf struct {
 	} `koanf:"wireguard" validate:"required"`
 
 	RestApi struct {
-		Port int `koanf:"port" validate:"required,min=1,max=65535"`
+		Port    int    `koanf:"port" validate:"required,min=1,max=65535"`
+		GinMode string `koanf:"ginmode" validate:"required,oneof=release debug test"`
 	} `koanf:"restapi" validate:"required"`
 
 	Database struct {

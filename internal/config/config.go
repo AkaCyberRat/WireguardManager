@@ -32,8 +32,8 @@ func NewConfig() (*Configuration, error) {
 		"app.wireguard.port":      51820,
 		"app.wireguard.peerlimit": 100,
 
-		"app.api.port":  5000,
-		"app.api.usetc": true,
+		"app.restapi.port":    5000,
+		"app.restapi.ginmode": "release",
 
 		"app.dataBase.path": "/app/db/service.db",
 

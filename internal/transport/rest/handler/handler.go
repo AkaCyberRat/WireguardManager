@@ -22,10 +22,10 @@ func NewHandler(deps Deps) *Handler {
 	}
 }
 
-func (h *Handler) Init() *gin.Engine {
+func (h *Handler) Init(ginMode string) *gin.Engine {
+	gin.SetMode(ginMode)
 
 	router := gin.Default()
-
 	router.Use(
 		gin.Recovery(),
 		gin.Logger(),
