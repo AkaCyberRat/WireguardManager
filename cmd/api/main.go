@@ -23,7 +23,7 @@ func main() {
 	//
 	// Set temp logging configuration
 	//
-	logging.TempConfig()
+	logging.PreConfigure()
 
 	//
 	// Load new configuration from env variables and config files
@@ -94,7 +94,7 @@ func main() {
 	//
 	handler := handler.NewHandler(handler.Deps{
 		PeerService: services.PeerService,
-	}).Init()
+	}).Init(conf.App.RestApi.GinMode)
 
 	//
 	// Init REST API server
