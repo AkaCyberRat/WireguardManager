@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"WireguardManager/internal/core"
@@ -14,6 +15,7 @@ type PeerService interface {
 	Create(ctx context.Context, model *core.CreatePeer) (*core.Peer, error)
 	Update(ctx context.Context, model *core.UpdatePeer) (*core.Peer, error)
 	Delete(ctx context.Context, model *core.DeletePeer) (*core.Peer, error)
+	Init(deps any) error
 }
 
 // PeerService interface implementation
@@ -21,6 +23,10 @@ type Peer struct {
 	peerRepos repository.PeerRepository
 	txManager repository.TransactionManager
 	netTool   network.NetworkTool
+}
+
+type PeerInitDeps struct {
+	PeersToCreate []core.CreatePeer
 }
 
 func NewPeerService(peerRep repository.PeerRepository, netTool network.NetworkTool, tm repository.TransactionManager) *Peer {
@@ -196,4 +202,22 @@ func (s *Peer) Delete(ctx context.Context, model *core.DeletePeer) (*core.Peer, 
 	}
 
 	return peer, nil
+}
+
+func (s *Peer) Init(deps any) error {
+
+	concreteDeps, ok := deps.(PeerInitDeps)
+	if !ok {
+		return errors.New("dependency type error")
+	}
+
+	for _, peer := range concreteDeps.PeersToCreate {
+
+		_, err := s.Create(context.Background(), &peer)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

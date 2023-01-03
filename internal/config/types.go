@@ -53,7 +53,7 @@ type DevelopConf struct {
 		} `koanf:"server" validate:"required"`
 
 		Peer struct {
-			ToCreate []core.CreatePeer `koanf:"peers" validete:"omitempty,dive"`
+			PeersToCreate []core.CreatePeer `koanf:"peers" validete:"omitempty,dive"`
 		}
 	}
 }

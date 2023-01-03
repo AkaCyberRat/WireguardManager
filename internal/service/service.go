@@ -23,3 +23,15 @@ func NewServices(deps Deps) Services {
 
 	return services
 }
+
+type InitDeps struct {
+	PeerInitDeps PeerInitDeps
+}
+
+func (s *Services) Init(deps InitDeps) error {
+	err := s.PeerService.Init(deps.PeerInitDeps)
+
+	if err != nil {
+		return err
+	}
+}
