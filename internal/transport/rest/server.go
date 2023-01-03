@@ -29,7 +29,7 @@ func NewServer(port int, handler http.Handler) *Server {
 	}
 }
 
-func (s *Server) ListenAndServe(port int) error {
+func (s *Server) ListenAndServe() error {
 	return s.httpServer.ListenAndServe()
 }
 
