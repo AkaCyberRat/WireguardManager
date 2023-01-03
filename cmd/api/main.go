@@ -37,15 +37,15 @@ func main() {
 	// Reconfigure logging using new configuration
 	//
 	logging.Configure(logging.Deps{
-		ConsoleLogLevel: conf.LoggingConsoleLevel,
-		FileLogLevel:    conf.LoggingFileLevel,
-		FilePath:        conf.LoggingFilePath,
+		ConsoleLogLevel: conf.App.Logging.ConsoleLevel,
+		FileLogLevel:    conf.App.Logging.FileLevel,
+		FilePath:        conf.App.Logging.FolderPath,
 	})
 
 	//
 	// Open database
 	//
-	db, err := gorm.Open(sqlite.Open(conf.DataBasePath), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(conf.App.Database.Path), &gorm.Config{})
 	if err != nil {
 		logrus.Fatal("Db err: %s", err.Error())
 	}
@@ -54,7 +54,7 @@ func main() {
 	// Create and initialize (if need) repositories
 	//
 	repositories, err := storage.NewRepositories(db).Init(storage.InitDeps{
-		PeerCount: conf.WireguardPeerLimit,
+		PeerCount: conf.App.Wireguard.PeerLimit,
 	})
 	if err != nil {
 		logrus.Fatal("Repository err: ", err.Error())
@@ -67,7 +67,7 @@ func main() {
 		WireguardInterface: "wg0",
 		WireguardIpNet:     "10.0.0.0/8",
 		PrivateKey:         "uKIkAl5agqGLoodeDAdtgZHh91vXck5z/mmxETx2dWs=",
-		Port:               conf.WireguardPort,
+		Port:               conf.App.Wireguard.Port,
 		UseTC:              true,
 	})
 	if err != nil {
@@ -83,6 +83,12 @@ func main() {
 		NetTool:            netTool,
 	})
 
+	if conf.App.LaunchMode == config.Develop {
+		services.Init(service.InitDeps{
+			PeerInitDeps: service.PeerInitDeps{PeersToCreate: conf.Develop.Services.Peer.PeersToCreate},
+		})
+	}
+
 	//
 	// Init REST API endpoint handlers
 	//
@@ -93,14 +99,14 @@ func main() {
 	//
 	// Init REST API server
 	//
-	restServer := rest.NewServer(conf.ApiPort, handler)
+	restServer := rest.NewServer(conf.App.RestApi.Port, handler)
 
 	//
 	// Run REST API server
 	//
 	go func() {
 		logrus.Info("Starting REST api server")
-		if err := restServer.ListenAndServe(conf.ApiPort); err != nil {
+		if err := restServer.ListenAndServe(); err != nil {
 			logrus.Fatal("rest listen and serve err: ", err.Error())
 		}
 	}()
