@@ -3,8 +3,8 @@ package network
 import "WireguardManager/internal/core"
 
 type NetworkTool interface {
-	Enable(peer *core.Peer) error
-	Disable(peer *core.Peer) error
+	EnablePeer(peer *core.Peer) error
+	DisablePeer(peer *core.Peer) error
 }
 
 type Deps struct {
@@ -35,7 +35,7 @@ func NewNetworkTool(deps Deps) (*Tool, error) {
 	return &tool, nil
 }
 
-func (t *Tool) Enable(peer *core.Peer) error {
+func (t *Tool) EnablePeer(peer *core.Peer) error {
 
 	err := t.wgPeerUp(peer.Ip, peer.PublicKey, peer.PresharedKey)
 	if err != nil {
@@ -50,7 +50,7 @@ func (t *Tool) Enable(peer *core.Peer) error {
 	return err
 }
 
-func (t *Tool) Disable(peer *core.Peer) error {
+func (t *Tool) DisablePeer(peer *core.Peer) error {
 
 	err := t.wgPeerDown(peer.Ip, peer.PublicKey)
 	if err != nil {

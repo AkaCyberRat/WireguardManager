@@ -84,7 +84,7 @@ func (s *Peer) Create(ctx context.Context, model *core.CreatePeer) (*core.Peer, 
 		}
 
 		if peer.Status == core.Enabled {
-			err = s.netTool.Enable(peer)
+			err = s.netTool.EnablePeer(peer)
 			if err != nil {
 				return
 			}
@@ -142,13 +142,13 @@ func (s *Peer) Update(ctx context.Context, model *core.UpdatePeer) (*core.Peer, 
 	}
 
 	if lastStatus == core.Enabled {
-		err = s.netTool.Disable(peer)
+		err = s.netTool.DisablePeer(peer)
 		if err != nil {
 			return nil, err
 		}
 	}
 	if peer.Status == core.Enabled {
-		err = s.netTool.Enable(peer)
+		err = s.netTool.EnablePeer(peer)
 		if err != nil {
 			return nil, err
 		}
@@ -181,7 +181,7 @@ func (s *Peer) Delete(ctx context.Context, model *core.DeletePeer) (*core.Peer, 
 	}
 
 	if peer.Status == core.Enabled {
-		err = s.netTool.Disable(peer)
+		err = s.netTool.DisablePeer(peer)
 		if err != nil {
 			return nil, err
 		}
