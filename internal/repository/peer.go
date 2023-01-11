@@ -8,6 +8,7 @@ type PeerRepository interface {
 
 	Add(model *core.Peer) (*core.Peer, error)
 	Update(model *core.Peer) (*core.Peer, error)
+	GetAll() ([]*core.Peer, error)
 	GetById(id string) (*core.Peer, error)
 	GetUnused() (*core.Peer, error)
 }

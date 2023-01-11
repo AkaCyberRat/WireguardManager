@@ -68,6 +68,27 @@ func (r PeerRepository) Update(model *core.Peer) (*core.Peer, error) {
 	return model, err
 }
 
+func (r PeerRepository) GetAll() ([]*core.Peer, error) {
+	var peers []models.Peer
+
+	err := r.db.Model(&models.Peer{}).Find(&peers).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, core.ErrPeerNotFound
+		}
+
+		return nil, err
+	}
+
+	models := []*core.Peer{}
+	for _, peer := range peers {
+		model := peer.ToCore()
+		models = append(models, model)
+	}
+
+	return models, err
+}
+
 func (r PeerRepository) GetById(id string) (*core.Peer, error) {
 	if !validId(id) {
 		return nil, core.ErrPeerNotFound
@@ -75,8 +96,9 @@ func (r PeerRepository) GetById(id string) (*core.Peer, error) {
 
 	intId, _ := strconv.Atoi(id)
 
-	peer := models.Peer{Id: uint(intId)}
-	err := r.db.First(&peer).Error
+	// peer := models.Peer{Id: uint(intId)}
+	peer := models.Peer{}
+	err := r.db.Model(&models.Peer{}).Where("id = ?", intId).First(&peer).Error
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, core.ErrPeerNotFound
