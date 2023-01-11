@@ -3,46 +3,54 @@ package sqlite
 import (
 	"WireguardManager/internal/core"
 	"WireguardManager/internal/repository/sqlite/models"
+	"WireguardManager/internal/utility/network"
 	"fmt"
 
 	"gorm.io/gorm"
 )
 
+type Repositories struct {
+	PeerRepository   *PeerRepository
+	ServerRepository *ServerRepository
+}
+
+func NewRepositories(db *gorm.DB) *Repositories {
+	db.AutoMigrate(models.Peer{}, models.Server{})
+
+	repositories := Repositories{
+		PeerRepository:   NewSqlitePeerRepository(db),
+		ServerRepository: NewSqliteServerRepository(db),
+	}
+
+	return &repositories
+}
+
 type InitDeps struct {
-	WireguardInterfacePublicKey string
-	WireguardInterfaceIp        string
+	NetTool network.NetworkTool
+
+	WireguardPrivateKey string
+	WireguardPort       int
+	WireguardEnabled    bool
 
 	PeerCount int
 }
 
-type Repositories struct {
-	PeerRepos          *PeerRepository
-	TransactionManager *TransactionManager
-}
+func (r *Repositories) Init(deps InitDeps) error {
 
-func NewRepositories(db *gorm.DB) Repositories {
-	db.AutoMigrate(models.Peer{})
+	if r.PeerRepository.GetPeersCount() == 0 && r.PeerRepository.GetPeersLimit() == 0 {
+		if err := r.initPeers(deps.PeerCount); err != nil {
+			return err
+		}
 
-	repositories := Repositories{
-		PeerRepos:          NewSqlitePeerRepository(db),
-		TransactionManager: NewSqliteTransactionManager(db),
+		if err := r.initServer(deps.NetTool, deps.WireguardPrivateKey, deps.WireguardPort, deps.WireguardEnabled); err != nil {
+			return err
+		}
 	}
 
-	return repositories
+	return nil
 }
 
-func (r Repositories) Init(deps InitDeps) (Repositories, error) {
-
-	if r.PeerRepos.GetPeersCount() == 0 && r.PeerRepos.GetPeersLimit() == 0 {
-		err := InitPeers(deps.PeerCount, r.PeerRepos)
-
-		return r, err
-	}
-
-	return r, nil
-}
-
-func InitPeers(count int, r *PeerRepository) error {
+func (r *Repositories) initPeers(count int) error {
 
 	for i := 1; i <= count; i++ {
 		oct3 := 255 & (i >> 8)
@@ -54,11 +62,34 @@ func InitPeers(count int, r *PeerRepository) error {
 			Status: core.Unused,
 		}
 
-		_, err := r.Add(&peer)
-		if err != nil {
+		if _, err := r.PeerRepository.Add(&peer); err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func (r *Repositories) initServer(netTool network.NetworkTool, privateKey string, port int, enabled bool) error {
+	var err error
+
+	if privateKey == "" {
+		if privateKey, err = netTool.GeneratePrivateKey(); err != nil {
+			return err
+		}
+	}
+
+	publicKey, err := netTool.GeneratePublicKey(privateKey)
+	if err != nil {
+		return err
+	}
+
+	server := core.Server{
+		PublicKey:  publicKey,
+		PrivateKey: privateKey,
+		Enabled:    enabled,
+	}
+
+	_, err = r.ServerRepository.Save(&server)
+	return err
 }
