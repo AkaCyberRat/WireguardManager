@@ -31,7 +31,7 @@ func Run(command string) (string, error) {
 		logrus.Errorf("Command: '%v' Error: '%v' '%v'", command, err.Error(), strErr)
 		return strOut, err
 	}
-	logrus.Debugf("Command: '%v' Out: '%v'", cmd.String(), strOut)
 
+	logrus.Tracef("Command: '%v' Out: '%v'", cmd.String(), strOut)
 	return strOut, nil
 }
