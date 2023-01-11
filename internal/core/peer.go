@@ -33,8 +33,13 @@ const (
 //
 
 type GetPeer struct {
-	Id string
-	//PublicKey string
+	Id string `validate:"required"`
+	//PublicKey string `validate:"requred,base64"`
+}
+
+func (p *GetPeer) Validate() bool {
+	err := validator.New().Struct(p)
+	return err == nil
 }
 
 type CreatePeer struct {
@@ -47,7 +52,6 @@ type CreatePeer struct {
 
 func (p *CreatePeer) Validate() bool {
 	err := validator.New().Struct(p)
-
 	return err == nil
 }
 
@@ -61,16 +65,12 @@ type UpdatePeer struct {
 }
 
 func (p *UpdatePeer) Validate() bool {
-	err := validator.New().Struct(p)
-	if err != nil {
-		return false
-	}
-
 	if p.PublicKey == nil && p.PresharedKey == nil && p.DownloadSpeed == nil && p.UploadSpeed == nil && p.Enabled == nil {
 		return false
 	}
 
-	return true
+	err := validator.New().Struct(p)
+	return err == nil
 }
 
 type DeletePeer struct {
