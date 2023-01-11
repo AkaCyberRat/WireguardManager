@@ -6,32 +6,31 @@ import (
 )
 
 type Deps struct {
-	NetTool            network.NetworkTool
-	PeerRepos          repository.PeerRepository
-	TransactionManager repository.TransactionManager
+	NetTool          network.NetworkTool
+	PeerRepository   repository.PeerRepository
+	ServerRepository repository.ServerRepository
 }
 
 type Services struct {
-	PeerService PeerService
+	PeerService    PeerService
+	ServerService  ServerService
+	RecoverService RecoverService
+	SyncService    SyncService
 }
 
 func NewServices(deps Deps) Services {
 
+	syncService := NewSyncService()
+	recoverService := NewRecoverService(deps.PeerRepository, deps.ServerRepository, deps.NetTool)
+	peerService := NewPeerService(deps.ServerRepository, deps.PeerRepository, deps.NetTool, syncService)
+	serverService := NewServerService(deps.ServerRepository, deps.NetTool, syncService, recoverService)
+
 	services := Services{
-		PeerService: NewPeerService(deps.PeerRepos, deps.NetTool, deps.TransactionManager),
+		PeerService:    peerService,
+		ServerService:  serverService,
+		RecoverService: recoverService,
+		SyncService:    syncService,
 	}
 
 	return services
-}
-
-type InitDeps struct {
-	PeerInitDeps PeerInitDeps
-}
-
-func (s *Services) Init(deps InitDeps) error {
-	err := s.PeerService.Init(deps.PeerInitDeps)
-
-	if err != nil {
-		return err
-	}
 }
