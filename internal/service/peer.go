@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"WireguardManager/internal/core"
@@ -15,188 +14,50 @@ type PeerService interface {
 	Create(ctx context.Context, model *core.CreatePeer) (*core.Peer, error)
 	Update(ctx context.Context, model *core.UpdatePeer) (*core.Peer, error)
 	Delete(ctx context.Context, model *core.DeletePeer) (*core.Peer, error)
-	Init(deps any) error
 }
 
 // PeerService interface implementation
 type Peer struct {
-	peerRepos repository.PeerRepository
-	txManager repository.TransactionManager
-	netTool   network.NetworkTool
+	syncService SyncService
+	serverRepos repository.ServerRepository
+	peerRepos   repository.PeerRepository
+	netTool     network.NetworkTool
 }
 
-type PeerInitDeps struct {
-	PeersToCreate []core.CreatePeer
-}
-
-func NewPeerService(peerRep repository.PeerRepository, netTool network.NetworkTool, tm repository.TransactionManager) *Peer {
-	return &Peer{peerRepos: peerRep, netTool: netTool, txManager: tm}
+func NewPeerService(serverRepository repository.ServerRepository, peerRep repository.PeerRepository, netTool network.NetworkTool, syncService SyncService) *Peer {
+	return &Peer{
+		serverRepos: serverRepository,
+		syncService: syncService,
+		peerRepos:   peerRep,
+		netTool:     netTool,
+	}
 }
 
 func (s *Peer) Get(ctx context.Context, model *core.GetPeer) (*core.Peer, error) {
-	peer, err := s.peerRepos.GetById(model.Id)
-	if err != nil {
-		if err == core.ErrPeerNotFound {
-			return nil, err
-		}
-
-		return nil, fmt.Errorf("Peer repository error: %w", err)
-	}
-
-	if peer.Status == core.Unused {
-		return nil, core.ErrPeerNotFound
-	}
-
-	return peer, nil
-}
-
-func (s *Peer) Create(ctx context.Context, model *core.CreatePeer) (*core.Peer, error) {
-	var peer *core.Peer
-	var err error
-
 	if !model.Validate() {
 		return nil, core.ErrModelValidation
 	}
 
-	_, err = s.txManager.Transaction(func(tm repository.TransactionManager) (out interface{}, err error) {
-		pRepos := tm.GetPeerRepository()
+	var peer *core.Peer
+	err := s.syncService.InPeerUseContext(model.Id, func() error {
+		var err error
 
-		count := pRepos.GetPeersCount()
-		limit := pRepos.GetPeersLimit()
-		if count >= limit {
-			err = core.ErrPeerLimitReached
-			return
-		}
-
-		peer, err = pRepos.GetUnused()
+		peer, err = s.peerRepos.GetById(model.Id)
 		if err != nil {
-			return
-		}
-
-		peer.PublicKey = model.PublicKey
-		peer.PresharedKey = model.PresharedKey
-		peer.DownloadSpeed = model.DownloadSpeed
-		peer.UploadSpeed = model.UploadSpeed
-		if *model.Enabled {
-			peer.Status = core.Enabled
-		} else {
-			peer.Status = core.Disabled
-		}
-
-		if peer.Status == core.Enabled {
-			err = s.netTool.EnablePeer(peer)
-			if err != nil {
-				return
+			if err == core.ErrPeerNotFound {
+				return err
 			}
+
+			return fmt.Errorf("Peer repository error: %w", err)
 		}
 
-		_, err = pRepos.Update(peer)
+		if peer.Status == core.Unused {
+			return core.ErrPeerNotFound
+		}
 
-		return
+		return nil
 	})
 
-	return peer, err
-}
-
-func (s *Peer) Update(ctx context.Context, model *core.UpdatePeer) (*core.Peer, error) {
-	var peer *core.Peer
-	var err error
-
-	if !model.Validate() {
-		return nil, core.ErrModelValidation
-	}
-
-	peer, err = s.peerRepos.GetById(model.Id)
-	if err != nil {
-		if err == core.ErrPeerNotFound {
-			return nil, err
-		}
-
-		return nil, fmt.Errorf("Peer repository error: %w", err)
-	}
-
-	if peer.Status == core.Unused {
-		return nil, core.ErrPeerNotFound
-	}
-
-	lastStatus := peer.Status
-
-	if model.PublicKey != nil {
-		peer.PublicKey = *model.PublicKey
-	}
-	if model.PresharedKey != nil {
-		peer.PresharedKey = *model.PresharedKey
-	}
-	if model.DownloadSpeed != nil {
-		peer.DownloadSpeed = *model.DownloadSpeed
-	}
-	if model.UploadSpeed != nil {
-		peer.UploadSpeed = *model.UploadSpeed
-	}
-	if model.Enabled != nil {
-		if *model.Enabled {
-			peer.Status = core.Enabled
-		} else {
-			peer.Status = core.Disabled
-		}
-	}
-
-	if lastStatus == core.Enabled {
-		err = s.netTool.DisablePeer(peer)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if peer.Status == core.Enabled {
-		err = s.netTool.EnablePeer(peer)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	_, err = s.peerRepos.Update(peer)
-
-	return peer, err
-}
-
-func (s *Peer) Delete(ctx context.Context, model *core.DeletePeer) (*core.Peer, error) {
-	var peer *core.Peer
-	var err error
-
-	if !model.Validate() {
-		return nil, core.ErrModelValidation
-	}
-
-	peer, err = s.peerRepos.GetById(model.Id)
-	if err != nil {
-		if err == core.ErrPeerNotFound {
-			return nil, err
-		}
-
-		return nil, fmt.Errorf("Peer repository error: %w", err)
-	}
-
-	if peer.Status == core.Unused {
-		return nil, core.ErrPeerNotFound
-	}
-
-	if peer.Status == core.Enabled {
-		err = s.netTool.DisablePeer(peer)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	rewritedPeer := core.Peer{}
-	rewritedPeer.Id = peer.Id
-	rewritedPeer.Ip = peer.Ip
-	rewritedPeer.PublicKey = ""
-	rewritedPeer.PresharedKey = ""
-	rewritedPeer.DownloadSpeed = 0
-	rewritedPeer.UploadSpeed = 0
-	rewritedPeer.Status = core.Unused
-
-	_, err = s.peerRepos.Update(&rewritedPeer)
 	if err != nil {
 		return nil, err
 	}
@@ -204,20 +65,194 @@ func (s *Peer) Delete(ctx context.Context, model *core.DeletePeer) (*core.Peer, 
 	return peer, nil
 }
 
-func (s *Peer) Init(deps any) error {
+func (s *Peer) Create(ctx context.Context, model *core.CreatePeer) (*core.Peer, error) {
+	var peer *core.Peer
 
-	concreteDeps, ok := deps.(PeerInitDeps)
-	if !ok {
-		return errors.New("dependency type error")
+	if !model.Validate() {
+		return nil, core.ErrModelValidation
 	}
 
-	for _, peer := range concreteDeps.PeersToCreate {
+	err := s.syncService.InServerUseContext(func() error {
+		return s.syncService.InPeerCreateContext(func() error {
+			var err error
 
-		_, err := s.Create(context.Background(), &peer)
-		if err != nil {
+			count := s.peerRepos.GetPeersCount()
+			limit := s.peerRepos.GetPeersLimit()
+			if count >= limit {
+				return core.ErrPeerLimitReached
+			}
+
+			peer, err = s.peerRepos.GetUnused()
+			if err != nil {
+				return err
+			}
+
+			peer.PublicKey = model.PublicKey
+			peer.PresharedKey = model.PresharedKey
+			peer.DownloadSpeed = model.DownloadSpeed
+			peer.UploadSpeed = model.UploadSpeed
+			if *model.Enabled {
+				peer.Status = core.Enabled
+			} else {
+				peer.Status = core.Disabled
+			}
+
+			server, err := s.serverRepos.Get()
+			if err != nil {
+				return err
+			}
+
+			if peer.Status == core.Enabled && server.Enabled {
+				err = s.netTool.EnablePeer(peer)
+				if err != nil {
+					return err
+				}
+			}
+
+			_, err = s.peerRepos.Update(peer)
 			return err
-		}
+		})
+	})
+
+	if err != nil {
+		return nil, err
 	}
 
-	return nil
+	return peer, nil
+}
+
+func (s *Peer) Update(ctx context.Context, model *core.UpdatePeer) (*core.Peer, error) {
+	var peer *core.Peer
+
+	if !model.Validate() {
+		return nil, core.ErrModelValidation
+	}
+
+	err := s.syncService.InServerUseContext(func() error {
+		return s.syncService.InPeerEditContext(model.Id, func() error {
+			var err error
+
+			peer, err = s.peerRepos.GetById(model.Id)
+			if err != nil {
+				if err == core.ErrPeerNotFound {
+					return err
+				}
+
+				return fmt.Errorf("Peer repository error: %w", err)
+			}
+
+			if peer.Status == core.Unused {
+				return core.ErrPeerNotFound
+			}
+
+			lastStatus := peer.Status
+
+			if model.PublicKey != nil {
+				peer.PublicKey = *model.PublicKey
+			}
+			if model.PresharedKey != nil {
+				peer.PresharedKey = *model.PresharedKey
+			}
+			if model.DownloadSpeed != nil {
+				peer.DownloadSpeed = *model.DownloadSpeed
+			}
+			if model.UploadSpeed != nil {
+				peer.UploadSpeed = *model.UploadSpeed
+			}
+			if model.Enabled != nil {
+				if *model.Enabled {
+					peer.Status = core.Enabled
+				} else {
+					peer.Status = core.Disabled
+				}
+			}
+
+			server, err := s.serverRepos.Get()
+			if err != nil {
+				return err
+			}
+
+			if server.Enabled {
+				if lastStatus == core.Enabled {
+					err = s.netTool.DisablePeer(peer)
+					if err != nil {
+						return err
+					}
+				}
+
+				if peer.Status == core.Enabled {
+					err = s.netTool.EnablePeer(peer)
+					if err != nil {
+						return err
+					}
+				}
+			}
+
+			_, err = s.peerRepos.Update(peer)
+			return err
+		})
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return peer, nil
+}
+
+func (s *Peer) Delete(ctx context.Context, model *core.DeletePeer) (*core.Peer, error) {
+	var peer *core.Peer
+
+	if !model.Validate() {
+		return nil, core.ErrModelValidation
+	}
+
+	err := s.syncService.InServerUseContext(func() error {
+		return s.syncService.InPeerEditContext(model.Id, func() error {
+			var err error
+
+			peer, err = s.peerRepos.GetById(model.Id)
+			if err != nil {
+				if err == core.ErrPeerNotFound {
+					return err
+				}
+
+				return fmt.Errorf("Peer repository error: %w", err)
+			}
+
+			if peer.Status == core.Unused {
+				return core.ErrPeerNotFound
+			}
+
+			server, err := s.serverRepos.Get()
+			if err != nil {
+				return err
+			}
+
+			if peer.Status == core.Enabled && server.Enabled {
+				err = s.netTool.DisablePeer(peer)
+				if err != nil {
+					return err
+				}
+			}
+
+			rewritedPeer := core.Peer{}
+			rewritedPeer.Id = peer.Id
+			rewritedPeer.Ip = peer.Ip
+			rewritedPeer.PublicKey = ""
+			rewritedPeer.PresharedKey = ""
+			rewritedPeer.DownloadSpeed = 0
+			rewritedPeer.UploadSpeed = 0
+			rewritedPeer.Status = core.Unused
+
+			_, err = s.peerRepos.Update(&rewritedPeer)
+			return err
+		})
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return peer, nil
 }
