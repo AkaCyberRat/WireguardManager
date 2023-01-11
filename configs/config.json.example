@@ -1,0 +1,25 @@
+{
+	"host": {
+		"ip": "127.0.0.1"
+	},
+
+	"wiregiard":{
+		"port": 51820,
+		"peerlimit": 100
+	},
+
+	"restapi":{
+		"port": 5000,
+		"ginmode": "release"
+	},
+
+	"database":{
+		"filepath":"/app/db/service.db"
+	},
+
+	"logging":{
+		"folderpath": "/app/logs/",
+		"consolelevel": "info",
+		"filelevel": "debug"
+	}
+}

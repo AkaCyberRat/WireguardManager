@@ -24,22 +24,19 @@ func NewConfig() (*Configuration, error) {
 	// (First layer) Set default values
 	//
 	err := configurator.Load(confmap.Provider(map[string]interface{}{
-		"app.launchmode": "default",
+		"host.ip": "127.0.0.1",
 
-		"app.host.ip":           "127.0.0.1",
-		"app.host.netinterface": "eth0",
+		"wireguard.port":      51820,
+		"wireguard.peerlimit": 100,
 
-		"app.wireguard.port":      51820,
-		"app.wireguard.peerlimit": 100,
+		"restapi.port":    5000,
+		"restapi.ginmode": "release",
 
-		"app.restapi.port":    5000,
-		"app.restapi.ginmode": "release",
+		"dataBase.filepath": "/app/db/service.db",
 
-		"app.dataBase.path": "/app/db/service.db",
-
-		"app.logging.folderpath":   "/app/logs/",
-		"app.logging.consolelevel": "info",
-		"app.logging.filelevel":    "error",
+		"logging.folderpath":   "/app/logs/",
+		"logging.consolelevel": "info",
+		"logging.filelevel":    "error",
 	}, "."), nil)
 
 	if err != nil {
@@ -72,7 +69,7 @@ func NewConfig() (*Configuration, error) {
 	// Unmarshal app config
 	//
 	var config Configuration
-	err = configurator.Unmarshal("app", &config.App)
+	err = configurator.Unmarshal("", &config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %v", err.Error())
 	}
@@ -80,49 +77,16 @@ func NewConfig() (*Configuration, error) {
 	//
 	// Validate app config
 	//
-	err = validator.New().Struct(config.App)
+	err = validator.New().Struct(config)
 	if err != nil {
 		return nil, fmt.Errorf("config validation failed: %v", err.Error())
-	}
-
-	//
-	// Load dev conig if 'develop' launch mode
-	//
-	if config.App.LaunchMode == Develop {
-		config.Develop, err = loadDevConfig()
-		return &config, err
 	}
 
 	return &config, nil
 }
 
-func loadDevConfig() (DevelopConf, error) {
-	var devConf DevelopConf
-
-	k := koanf.New(".")
-
-	err := k.Load(file.Provider("/app/configs/config.json.dev"), json.Parser())
-	if err != nil {
-		return DevelopConf{}, fmt.Errorf("failed to read dev config file: %v", err.Error())
-	}
-
-	logrus.Warn("Development configuraton has been read.")
-
-	err = k.Unmarshal("dev", &devConf)
-	if err != nil {
-		return DevelopConf{}, fmt.Errorf("failed to unmarshal dev config: %v", err.Error())
-	}
-
-	err = validator.New().Struct(devConf)
-	if err != nil {
-		return DevelopConf{}, fmt.Errorf("dev config validation failed: %v", err.Error())
-	}
-
-	return devConf, nil
-}
-
 func convertEnvVarName(s string) string {
 
 	return strings.Replace(
-		strings.TrimPrefix(s, "APP_"), "_", ".", -1)
+		strings.ToLower(strings.TrimPrefix(s, "APP_")), "_", ".", -1)
 }
