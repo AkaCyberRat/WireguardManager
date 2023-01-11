@@ -31,13 +31,6 @@ func PreConfigure() {
 func Configure(deps Deps) error {
 
 	//
-	// Set minimum level, then below override
-	// levels for every log output. And remove standart output.
-	//
-	logrus.SetLevel(logrus.TraceLevel)
-	logrus.SetOutput(io.Discard)
-
-	//
 	// Parse log levels from deps.
 	//
 	consLogLevel, err := logrus.ParseLevel(deps.ConsoleLogLevel)
@@ -61,6 +54,13 @@ func Configure(deps Deps) error {
 	if err != nil {
 		return fmt.Errorf("failed to open/create log file: %v", err.Error())
 	}
+
+	//
+	// Set minimum level, then below override
+	// levels for every log output. And remove standart output.
+	//
+	logrus.SetLevel(logrus.TraceLevel)
+	logrus.SetOutput(io.Discard)
 
 	//
 	// Add self-written console and file outputs
