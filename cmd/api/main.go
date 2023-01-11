@@ -21,7 +21,7 @@ import (
 
 func main() {
 	//
-	// Set temp logging configuration
+	// Preconfigure logger
 	//
 	logging.PreConfigure()
 
@@ -34,72 +34,72 @@ func main() {
 	}
 
 	//
-	// Reconfigure logging using new configuration
+	// Configure logger with new configuration
 	//
-	logging.Configure(logging.Deps{
-		ConsoleLogLevel: conf.App.Logging.ConsoleLevel,
-		FileLogLevel:    conf.App.Logging.FileLevel,
-		FilePath:        conf.App.Logging.FolderPath,
+	err = logging.Configure(logging.Deps{
+		ConsoleLogLevel: conf.Logging.ConsoleLevel,
+		FileLogLevel:    conf.Logging.FileLevel,
+		FilePath:        conf.Logging.FolderPath,
 	})
-
-	//
-	// Open database
-	//
-	db, err := gorm.Open(sqlite.Open(conf.App.Database.Path), &gorm.Config{})
 	if err != nil {
-		logrus.Fatal("Db err: %s", err.Error())
+		logrus.Fatal("Logging configure error: ", err.Error())
 	}
 
 	//
-	// Create and initialize (if need) repositories
+	// Connect database
 	//
-	repositories, err := storage.NewRepositories(db).Init(storage.InitDeps{
-		PeerCount: conf.App.Wireguard.PeerLimit,
-	})
+	db, err := gorm.Open(sqlite.Open(conf.Database.FilePath), &gorm.Config{})
 	if err != nil {
-		logrus.Fatal("Repository err: ", err.Error())
+		logrus.Fatal("Db error: %s", err.Error())
 	}
 
 	//
 	// Init NetworkTool for driving Wireguard interface and TrafficControl tool
 	//
-	netTool, err := network.NewNetworkTool(network.Deps{
-		WireguardInterface: "wg0",
-		WireguardIpNet:     "10.0.0.0/8",
-		PrivateKey:         "uKIkAl5agqGLoodeDAdtgZHh91vXck5z/mmxETx2dWs=",
-		Port:               conf.App.Wireguard.Port,
-		UseTC:              true,
-	})
-	if err != nil {
-		logrus.Fatal("Network error: ", err.Error())
+	netTool := network.NewNetworkTool(conf.Wireguard.Port)
+
+	//
+	// Create and prepare repositories
+	//
+	repositories := storage.NewRepositories(db)
+	repositoriesInitDeps := storage.InitDeps{
+		NetTool:          netTool,
+		WireguardPort:    conf.Wireguard.Port,
+		WireguardEnabled: true,
+		PeerCount:        conf.Wireguard.PeerLimit,
+	}
+	if err = repositories.Init(repositoriesInitDeps); err != nil {
+		logrus.Fatal("Repository error: ", err.Error())
 	}
 
 	//
 	// Init services
 	//
 	services := service.NewServices(service.Deps{
-		PeerRepos:          repositories.PeerRepos,
-		TransactionManager: repositories.TransactionManager,
-		NetTool:            netTool,
+		NetTool:          netTool,
+		PeerRepository:   repositories.PeerRepository,
+		ServerRepository: repositories.ServerRepository,
 	})
-
-	if conf.App.LaunchMode == config.Develop {
-		services.Init(service.InitDeps{
-			PeerInitDeps: service.PeerInitDeps{PeersToCreate: conf.Develop.Services.Peer.PeersToCreate},
-		})
+	if err := services.RecoverService.RecoverServer(); err != nil {
+		logrus.Fatal("Failed to recover server: ", err.Error())
+	}
+	if err := services.RecoverService.RecoverPeers(); err != nil {
+		logrus.Fatal("Failed to recover peers: ", err.Error())
 	}
 
 	//
 	// Init REST API endpoint handlers
 	//
 	handler := handler.NewHandler(handler.Deps{
-		PeerService: services.PeerService,
-	}).Init(conf.App.RestApi.GinMode)
+		PeerService:   services.PeerService,
+		ServerService: services.ServerService,
+		Configuration: *conf,
+	}).Init(conf.RestApi.GinMode)
 
 	//
 	// Init REST API server
 	//
-	restServer := rest.NewServer(conf.App.RestApi.Port, handler)
+	restServer := rest.NewServer(conf.RestApi.Port, handler)
 
 	//
 	// Run REST API server
@@ -107,7 +107,7 @@ func main() {
 	go func() {
 		logrus.Info("Starting REST api server")
 		if err := restServer.ListenAndServe(); err != nil {
-			logrus.Fatal("rest listen and serve err: ", err.Error())
+			logrus.Fatal("rest listen and serve error: ", err.Error())
 		}
 	}()
 
@@ -125,5 +125,4 @@ func main() {
 	if err = restServer.Stop(context.Background()); err != nil {
 		logrus.Errorf("error occurred on rest server shutting down: %s", err.Error())
 	}
-
 }
