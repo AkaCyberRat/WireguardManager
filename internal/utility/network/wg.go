@@ -5,27 +5,34 @@ import (
 	"net"
 	"strings"
 
+	"github.com/sirupsen/logrus"
 	"github.com/vishvananda/netlink"
 	"golang.zx2c4.com/wireguard/wgctrl"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
-var wg_client *wgctrl.Client
+const (
+	WgIpNet = "10.0.0.0/8"
+	WgIp    = "10.0.0.0"
+)
 
-func (t *Tool) wgConfigure() error {
+func (t *Tool) wgServerUp(privateKey string) error {
 	var err error
-	wg_client, err = wgctrl.New()
-	if err != nil {
-		return err
+
+	if t.wg_client == nil {
+		t.wg_client, err = wgctrl.New()
+		if err != nil {
+			return err
+		}
 	}
 
 	// Create wg interface
-	if isWgExists(t.deps.WireguardInterface) {
+	if isWgExists(t.interfaceName) {
 		return errors.New("wg interface already exists")
 	}
 
 	linkAtrrs := netlink.NewLinkAttrs()
-	linkAtrrs.Name = t.deps.WireguardInterface
+	linkAtrrs.Name = t.interfaceName
 	linkAtrrs.MTU = 1420
 	linkAtrrs.TxQLen = 1000
 
@@ -38,52 +45,71 @@ func (t *Tool) wgConfigure() error {
 		return err
 	}
 
-	err = handle.LinkAdd(netlink.Link(wg_link))
-	if err != nil {
+	if err = handle.LinkAdd(netlink.Link(wg_link)); err != nil {
 		return err
 	}
 
 	// Configure wg interface
-	pk, err := wgtypes.ParseKey(t.deps.PrivateKey)
+	pk, err := wgtypes.ParseKey(privateKey)
 	if err != nil {
 		return err
 	}
 
 	config := wgtypes.Config{
 		PrivateKey:   &pk,
-		ListenPort:   &t.deps.Port,
+		ListenPort:   &t.port,
 		ReplacePeers: false,
 		Peers:        make([]wgtypes.PeerConfig, 0),
 	}
 
-	link, err := handle.LinkByName(t.deps.WireguardInterface)
+	link, err := handle.LinkByName(t.interfaceName)
 	if err != nil {
 		return err
 	}
 
-	addr, err := netlink.ParseAddr(t.deps.WireguardIpNet)
+	addr, err := netlink.ParseAddr(WgIpNet)
 	if err != nil {
 		return err
 	}
 
-	err = handle.AddrAdd(link, addr)
-	if err != nil {
+	if err = handle.AddrAdd(link, addr); err != nil {
 		return err
 	}
 
-	err = wg_client.ConfigureDevice(t.deps.WireguardInterface, config)
-	if err != nil {
+	if err = t.wg_client.ConfigureDevice(t.interfaceName, config); err != nil {
 		return err
 	}
 
 	// Up wg interface
-	nl_link, err := handle.LinkByName(t.deps.WireguardInterface)
+	nl_link, err := handle.LinkByName(t.interfaceName)
 	if err != nil {
 		return err
 	}
 
-	err = netlink.LinkSetUp(netlink.Link(nl_link))
-	return err
+	if err = netlink.LinkSetUp(netlink.Link(nl_link)); err != nil {
+		return err
+	}
+
+	logrus.Tracef("Wireguard interface enabled. [InterfaceName=%v, IpNet=%v, Port=%v]", t.interfaceName, WgIpNet, t.port)
+	return nil
+}
+
+func (t *Tool) wgServerDown() error {
+	linkAtrrs := netlink.NewLinkAttrs()
+	linkAtrrs.Name = t.interfaceName
+	linkAtrrs.MTU = 1420
+	linkAtrrs.TxQLen = 1000
+
+	link := wgLink{}
+	link.LinkAttrs = &linkAtrrs
+	link.LinkType = "wireguard"
+
+	if err := netlink.LinkDel(netlink.Link(link)); err != nil {
+		return err
+	}
+
+	logrus.Tracef("Wireguard interface disabled. [InterfaceName=%v, IpNet=%v, Port=%v]", t.interfaceName, WgIpNet, t.port)
+	return nil
 }
 
 func (t *Tool) wgPeerUp(ip string, publicKey string, presharedKey string) error {
@@ -113,9 +139,12 @@ func (t *Tool) wgPeerUp(ip string, publicKey string, presharedKey string) error 
 	}
 
 	peers := []wgtypes.PeerConfig{peer}
-	err = wg_client.ConfigureDevice(t.deps.WireguardInterface, wgtypes.Config{Peers: peers})
+	if err = t.wg_client.ConfigureDevice(t.interfaceName, wgtypes.Config{Peers: peers}); err != nil {
+		return err
+	}
 
-	return err
+	logrus.Tracef("Wireguard peer enabled. [Ip=%v, PubKey=%v]", ip, publicKey)
+	return nil
 }
 
 func (t *Tool) wgPeerDown(ip string, publicKey string) error {
@@ -137,14 +166,21 @@ func (t *Tool) wgPeerDown(ip string, publicKey string) error {
 	}
 
 	peers := []wgtypes.PeerConfig{peer}
-	err = wg_client.ConfigureDevice(t.deps.WireguardInterface, wgtypes.Config{Peers: peers})
+	if err = t.wg_client.ConfigureDevice(t.interfaceName, wgtypes.Config{Peers: peers}); err != nil {
+		return err
+	}
 
-	return err
+	logrus.Tracef("Wireguard peer disabled. [Ip=%v, PubKey=%v]", ip, publicKey)
+	return nil
 }
 
-func isWgExists(inf string) bool {
+//
+// Helpers
+//
 
-	_, err := netlink.LinkByName(inf)
+func isWgExists(interfaceName string) bool {
+
+	_, err := netlink.LinkByName(interfaceName)
 
 	return err == nil
 }
@@ -161,27 +197,3 @@ func (l wgLink) Attrs() *netlink.LinkAttrs {
 func (l wgLink) Type() string {
 	return l.LinkType
 }
-
-// func wgDelete() error {
-// 	linkAtrrs := netlink.NewLinkAttrs()
-// 	linkAtrrs.Name = "wg0"
-// 	linkAtrrs.MTU = 1420
-// 	linkAtrrs.TxQLen = 1000
-
-// 	link := wgLink{}
-// 	link.LinkAttrs = &linkAtrrs
-// 	link.LinkType = "wireguard"
-
-// 	err := netlink.LinkDel(netlink.Link(link))
-// 	return err
-// }
-
-// func wgDown() error {
-// 	link, err := netlink.LinkByName("wg0")
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	err = netlink.LinkSetDown(netlink.Link(link))
-// 	return err
-// }

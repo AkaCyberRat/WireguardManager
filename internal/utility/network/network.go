@@ -1,66 +1,102 @@
 package network
 
-import "WireguardManager/internal/core"
+import (
+	"WireguardManager/internal/core"
+
+	"github.com/sirupsen/logrus"
+	"golang.zx2c4.com/wireguard/wgctrl"
+	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+)
 
 type NetworkTool interface {
+	EnableServer(peer *core.Server) error
+	DisableServer() error
+
 	EnablePeer(peer *core.Peer) error
 	DisablePeer(peer *core.Peer) error
-}
 
-type Deps struct {
-	WireguardInterface string
-	WireguardIpNet     string
-	PrivateKey         string
-	Port               int
-	UseTC              bool
+	GeneratePublicKey(privateKey string) (string, error)
+	GeneratePrivateKey() (string, error)
 }
 
 type Tool struct {
-	deps Deps
+	interfaceName string
+	port          int
+	wg_client     *wgctrl.Client
 }
 
-func NewNetworkTool(deps Deps) (*Tool, error) {
-	tool := Tool{deps}
+func NewNetworkTool(port int) *Tool {
+	tool := Tool{interfaceName: "wg0", port: port}
 
-	err := tool.wgConfigure()
-	if err != nil {
-		return nil, err
+	return &tool
+}
+
+func (t *Tool) EnableServer(server *core.Server) error {
+
+	if err := t.wgServerUp(server.PrivateKey); err != nil {
+		return err
 	}
 
-	err = tool.tcConfigure()
-	if err != nil {
-		return nil, err
+	if err := t.tcServerUp(); err != nil {
+		return err
 	}
 
-	return &tool, nil
+	logrus.Debugf("Server enabled. [IpNet=%v, InterfaceName=%v, Port=%v]", WgIpNet, t.interfaceName, t.port)
+	return nil
+}
+
+func (t *Tool) DisableServer() error {
+
+	if err := t.tcServerDown(); err != nil {
+		return err
+	}
+
+	if err := t.wgServerDown(); err != nil {
+		return err
+	}
+
+	logrus.Debugf("Server disabled. [IpNet=%v, InterfaceName=%v, Port=%v]", WgIpNet, t.interfaceName, t.port)
+	return nil
 }
 
 func (t *Tool) EnablePeer(peer *core.Peer) error {
 
-	err := t.wgPeerUp(peer.Ip, peer.PublicKey, peer.PresharedKey)
-	if err != nil {
+	if err := t.wgPeerUp(peer.Ip, peer.PublicKey, peer.PresharedKey); err != nil {
 		return err
 	}
 
-	if !t.deps.UseTC {
-		return nil
+	if err := t.tcPeerUp(peer.Ip, peer.DownloadSpeed, peer.UploadSpeed); err != nil {
+		return err
 	}
 
-	err = t.tcPeerUp(peer.Ip, peer.DownloadSpeed, peer.UploadSpeed)
-	return err
+	logrus.Debugf("Peer enabled. [Id=%v, Ip=%v, PubKey=%v]", peer.Id, peer.Ip, peer.PublicKey)
+	return nil
 }
 
 func (t *Tool) DisablePeer(peer *core.Peer) error {
 
-	err := t.wgPeerDown(peer.Ip, peer.PublicKey)
-	if err != nil {
+	if err := t.wgPeerDown(peer.Ip, peer.PublicKey); err != nil {
 		return err
 	}
 
-	if !t.deps.UseTC {
-		return nil
+	if err := t.tcPeerDown(peer.Ip); err != nil {
+		return err
 	}
 
-	err = t.tcPeerDown(peer.Ip)
-	return err
+	logrus.Debugf("Peer disabled. [Id=%v, Ip=%v, PubKey=%v]", peer.Id, peer.Ip, peer.PublicKey)
+	return nil
+}
+
+func (t *Tool) GeneratePublicKey(privateKey string) (string, error) {
+	prKey, err := wgtypes.ParseKey(privateKey)
+	if err != nil {
+		return "", err
+	}
+
+	return prKey.PublicKey().String(), nil
+}
+
+func (t *Tool) GeneratePrivateKey() (string, error) {
+	pubKey, err := wgtypes.GeneratePrivateKey()
+	return pubKey.String(), err
 }
