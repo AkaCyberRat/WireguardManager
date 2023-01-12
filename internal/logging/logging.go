@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 
 	nested "github.com/antonfisher/nested-logrus-formatter"
 	"github.com/sirupsen/logrus"
@@ -46,11 +47,12 @@ func Configure(deps Deps) error {
 	//
 	// Prepare file writer for file logging.
 	//
-	if err = os.MkdirAll(deps.FilePath, 0777); err != nil {
+	folderPath, _ := filepath.Split(deps.FilePath)
+	if err = os.MkdirAll(folderPath, 0777); err != nil {
 		return fmt.Errorf("failed to create log dir: %v", err.Error())
 	}
 
-	fileWriter, err := os.OpenFile(deps.FilePath+"logs.txt", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0777)
+	fileWriter, err := os.OpenFile(deps.FilePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0777)
 	if err != nil {
 		return fmt.Errorf("failed to open/create log file: %v", err.Error())
 	}
