@@ -2,7 +2,7 @@ package config
 
 type Configuration struct {
 	Host struct {
-		Ip           string `koanf:"ip" validate:"required,ipv4"`
+		Ip string `koanf:"ip" validate:"required,ipv4"`
 	} `koanf:"host" validate:"required"`
 
 	Wireguard struct {
@@ -20,7 +20,7 @@ type Configuration struct {
 	} `koanf:"database" validate:"required"`
 
 	Logging struct {
-		FolderPath   string `koanf:"folderpath" validate:"required"`
+		FilePath     string `koanf:"filepath" validate:"required"`
 		FileLevel    string `koanf:"filelevel" validate:"required"`
 		ConsoleLevel string `koanf:"consolelevel" validate:"required"`
 	} `koanf:"logging" validate:"required"`

@@ -14,6 +14,11 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const (
+	ConfigFilepath = "/app/configs/config.json"
+	EnvPrefix      = "APP_"
+)
+
 func NewConfig() (*Configuration, error) {
 	//
 	// Create configurator instanse
@@ -34,9 +39,9 @@ func NewConfig() (*Configuration, error) {
 
 		"dataBase.filepath": "/app/db/service.db",
 
-		"logging.folderpath":   "/app/logs/",
+		"logging.filepath":     "/app/log/logs.txt",
 		"logging.consolelevel": "info",
-		"logging.filelevel":    "error",
+		"logging.filelevel":    "debug",
 	}, "."), nil)
 
 	if err != nil {
@@ -46,7 +51,7 @@ func NewConfig() (*Configuration, error) {
 	//
 	// (Second layer) Load config.json
 	//
-	err = configurator.Load(file.Provider("/app/configs/config.json"), json.Parser())
+	err = configurator.Load(file.Provider(ConfigFilepath), json.Parser())
 	if err == nil {
 		logrus.Info("User configuration has been read.")
 
@@ -60,7 +65,7 @@ func NewConfig() (*Configuration, error) {
 	//
 	// (Third layer) Load environment variables
 	//
-	err = configurator.Load(env.Provider("APP_", ".", convertEnvVarName), nil)
+	err = configurator.Load(env.Provider(EnvPrefix, ".", convertEnvVarName), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load environment variables: %v", err.Error())
 	}
@@ -88,5 +93,5 @@ func NewConfig() (*Configuration, error) {
 func convertEnvVarName(s string) string {
 
 	return strings.Replace(
-		strings.ToLower(strings.TrimPrefix(s, "APP_")), "_", ".", -1)
+		strings.ToLower(strings.TrimPrefix(s, EnvPrefix)), "_", ".", -1)
 }
