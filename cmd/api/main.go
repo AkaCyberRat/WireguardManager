@@ -15,7 +15,6 @@ import (
 	"WireguardManager/internal/utility/network"
 
 	"github.com/sirupsen/logrus"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -39,7 +38,7 @@ func main() {
 	err = logging.Configure(logging.Deps{
 		ConsoleLogLevel: conf.Logging.ConsoleLevel,
 		FileLogLevel:    conf.Logging.FileLevel,
-		FilePath:        conf.Logging.FolderPath,
+		FilePath:        conf.Logging.FilePath,
 	})
 	if err != nil {
 		logrus.Fatal("Logging configure error: ", err.Error())
@@ -48,9 +47,9 @@ func main() {
 	//
 	// Connect database
 	//
-	db, err := gorm.Open(sqlite.Open(conf.Database.FilePath), &gorm.Config{})
+	db, err := gorm.Open(storage.NewSqliteConnection(conf.Database.FilePath), &gorm.Config{})
 	if err != nil {
-		logrus.Fatal("Db error: %s", err.Error())
+		logrus.Fatal("Db error:", err.Error())
 	}
 
 	//
@@ -69,7 +68,7 @@ func main() {
 		PeerCount:        conf.Wireguard.PeerLimit,
 	}
 	if err = repositories.Init(repositoriesInitDeps); err != nil {
-		logrus.Fatal("Repository error: ", err.Error())
+		logrus.Fatal("Repository error:", err.Error())
 	}
 
 	//
