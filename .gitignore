@@ -1,1 +1,9 @@
-*-dev*
+.bin/
+.database/
+.tests/
+example/
+
+
+.env
+*.dev
+

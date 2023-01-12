@@ -1,0 +1,28 @@
+version: '3.2'
+
+services:
+  dev_wg_control:
+    build:
+      context: ../
+      dockerfile: ./deploy/Dockerfile
+
+    container_name: wireguard_manager
+    
+    ports:
+      - "51820:51820/udp"
+      - "5000:5000"
+    
+    volumes:
+      - wireguard_manager_db:/app/db/
+      - wireguard_manager_log:/app/log/
+      
+    env_file:
+      - ../configs/config.env.example
+
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+
+volumes:
+  wireguard_manager_db:
+  wireguard_manager_log: 
