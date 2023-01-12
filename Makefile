@@ -1,16 +1,25 @@
 .SILENT:
 
 
-b_api:
+
+api_build_local:
 	go mod download && mkdir -p ./.bin/api && go build -o ./.bin/api ./cmd/api/main.go
 
+api_run_local: api_build_local
+	./.bin/api/main
 
-r_api: build_api
+api_run_docker:
+	docker-compose -f ./deploy/docker-compose.yml up --build
+
+api_run_docker_dev:
+	docker-compose -f ./deploy/docker-compose.yml.dev up --build
 
 
-b_exp: 
-	go mod download && mkdir -p ./.bin/experiments && go build -o ./.bin/experiments ./cmd/experiments/main.go
+ 
+exmpl_build: 
+	go mod download && mkdir -p ./.bin/example && go build -o ./.bin/example ./cmd/example/main.go
 
-r_exp: b_exp
-	./.bin/experiments/main
+exmpl_run: b_exp 
+	
+	 ./.bin/example/main
 
