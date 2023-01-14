@@ -24,4 +24,16 @@ type Configuration struct {
 		FileLevel    string `koanf:"filelevel" validate:"required"`
 		ConsoleLevel string `koanf:"consolelevel" validate:"required"`
 	} `koanf:"logging" validate:"required"`
+
+	Jwt struct {
+		HS256 struct {
+			Use       *bool  `koanf:"use" validate:"omitempty"`
+			SecretKey string `koanf:"secretkey" validate:"omitempty"`
+		} `koanf:"hs256" validate:"omitempty"`
+
+		RS256 struct {
+			Use        *bool  `koanf:"use" validate:"omitempty"`
+			PubKeyPath string `koanf:"pubkeypath" validate:"omitempty"`
+		} `koanf:"rs256" validate:"omitempty"`
+	} `koanf:"jwt" validate:"omitempty"`
 }

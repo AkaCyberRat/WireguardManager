@@ -1,11 +1,11 @@
-package service
+package services
 
 import (
 	"context"
 
 	"WireguardManager/internal/core"
-	"WireguardManager/internal/repository"
-	"WireguardManager/internal/utility/network"
+	"WireguardManager/internal/repositories"
+	"WireguardManager/internal/tools/network"
 )
 
 type ServerService interface {
@@ -15,12 +15,12 @@ type ServerService interface {
 
 type Server struct {
 	syncService    SyncService
-	serverRepos    repository.ServerRepository
+	serverRepos    repositories.ServerRepository
 	netTool        network.NetworkTool
 	recoverService RecoverService
 }
 
-func NewServerService(serverRepos repository.ServerRepository, netTool network.NetworkTool, syncService SyncService, recoverService RecoverService) *Server {
+func NewServerService(serverRepos repositories.ServerRepository, netTool network.NetworkTool, syncService SyncService, recoverService RecoverService) *Server {
 	return &Server{serverRepos: serverRepos, netTool: netTool, syncService: syncService, recoverService: recoverService}
 }
 

@@ -1,19 +1,19 @@
-package handler
+package handlers
 
 import (
 	"net/http"
 
 	"WireguardManager/internal/config"
-	"WireguardManager/internal/service"
+	"WireguardManager/internal/services"
 	"WireguardManager/internal/transport/rest/middlewares"
-	"WireguardManager/internal/utility/auth"
+	"WireguardManager/internal/tools/auth"
 
 	"github.com/gin-gonic/gin"
 )
 
 type Deps struct {
-	PeerService   service.PeerService
-	ServerService service.ServerService
+	PeerService   services.PeerService
+	ServerService services.ServerService
 	Configuration config.Configuration
 }
 

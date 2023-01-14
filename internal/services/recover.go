@@ -1,9 +1,9 @@
-package service
+package services
 
 import (
 	"WireguardManager/internal/core"
-	"WireguardManager/internal/repository"
-	"WireguardManager/internal/utility/network"
+	"WireguardManager/internal/repositories"
+	"WireguardManager/internal/tools/network"
 )
 
 type RecoverService interface {
@@ -12,12 +12,12 @@ type RecoverService interface {
 }
 
 type Recover struct {
-	peerRepos   repository.PeerRepository
-	serverRepos repository.ServerRepository
+	peerRepos   repositories.PeerRepository
+	serverRepos repositories.ServerRepository
 	netTool     network.NetworkTool
 }
 
-func NewRecoverService(peerRepos repository.PeerRepository, serverRepos repository.ServerRepository, netTool network.NetworkTool) RecoverService {
+func NewRecoverService(peerRepos repositories.PeerRepository, serverRepos repositories.ServerRepository, netTool network.NetworkTool) RecoverService {
 	return &Recover{
 		peerRepos:   peerRepos,
 		serverRepos: serverRepos,

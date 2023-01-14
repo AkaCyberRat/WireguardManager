@@ -1,7 +1,7 @@
 package middlewares
 
 import (
-	"WireguardManager/internal/utility/auth"
+	"WireguardManager/internal/tools/auth"
 	"net/http"
 	"strings"
 

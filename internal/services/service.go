@@ -1,14 +1,14 @@
-package service
+package services
 
 import (
-	"WireguardManager/internal/repository"
-	"WireguardManager/internal/utility/network"
+	"WireguardManager/internal/repositories"
+	"WireguardManager/internal/tools/network"
 )
 
 type Deps struct {
 	NetTool          network.NetworkTool
-	PeerRepository   repository.PeerRepository
-	ServerRepository repository.ServerRepository
+	PeerRepository   repositories.PeerRepository
+	ServerRepository repositories.ServerRepository
 }
 
 type Services struct {

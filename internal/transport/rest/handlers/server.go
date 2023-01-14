@@ -1,12 +1,12 @@
-package handler
+package handlers
 
 import (
 	"net/http"
 
 	"WireguardManager/internal/config"
 	"WireguardManager/internal/core"
-	"WireguardManager/internal/service"
-	"WireguardManager/internal/utility/network"
+	"WireguardManager/internal/services"
+	"WireguardManager/internal/tools/network"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -14,10 +14,10 @@ import (
 
 type ServerHandler struct {
 	Configuration config.Configuration
-	serverService service.ServerService
+	serverService services.ServerService
 }
 
-func NewServerHandler(serverService service.ServerService, configuration config.Configuration) *ServerHandler {
+func NewServerHandler(serverService services.ServerService, configuration config.Configuration) *ServerHandler {
 	return &ServerHandler{serverService: serverService, Configuration: configuration}
 }
 

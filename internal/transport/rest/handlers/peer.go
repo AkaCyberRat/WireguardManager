@@ -1,20 +1,20 @@
-package handler
+package handlers
 
 import (
 	"net/http"
 
 	"WireguardManager/internal/core"
-	"WireguardManager/internal/service"
+	"WireguardManager/internal/services"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 )
 
 type PeerHandler struct {
-	peerService service.PeerService
+	peerService services.PeerService
 }
 
-func NewPeerHandler(s service.PeerService) *PeerHandler {
+func NewPeerHandler(s services.PeerService) *PeerHandler {
 	return &PeerHandler{peerService: s}
 }
 

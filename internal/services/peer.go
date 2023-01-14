@@ -1,12 +1,12 @@
-package service
+package services
 
 import (
 	"context"
 	"fmt"
 
 	"WireguardManager/internal/core"
-	"WireguardManager/internal/repository"
-	"WireguardManager/internal/utility/network"
+	"WireguardManager/internal/repositories"
+	"WireguardManager/internal/tools/network"
 )
 
 type PeerService interface {
@@ -19,12 +19,12 @@ type PeerService interface {
 // PeerService interface implementation
 type Peer struct {
 	syncService SyncService
-	serverRepos repository.ServerRepository
-	peerRepos   repository.PeerRepository
+	serverRepos repositories.ServerRepository
+	peerRepos   repositories.PeerRepository
 	netTool     network.NetworkTool
 }
 
-func NewPeerService(serverRepository repository.ServerRepository, peerRep repository.PeerRepository, netTool network.NetworkTool, syncService SyncService) *Peer {
+func NewPeerService(serverRepository repositories.ServerRepository, peerRep repositories.PeerRepository, netTool network.NetworkTool, syncService SyncService) *Peer {
 	return &Peer{
 		serverRepos: serverRepository,
 		syncService: syncService,
