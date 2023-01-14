@@ -7,11 +7,21 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 )
 
-// Scopes
 const (
 	ServerManager = "ServerManager"
 	PeerManager   = "PeerManager"
 )
+
+type AuthTool interface {
+	ValidateToken(signedToken string) (*JwtClaims, error)
+}
+
+type Tool struct {
+	SecretKeyHS256 []byte
+	PublicKeyRS256 []byte
+}
+
+// Scopes
 
 const (
 	HMACSecretKey = "secret"
