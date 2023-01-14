@@ -5,6 +5,8 @@ import (
 
 	"WireguardManager/internal/config"
 	"WireguardManager/internal/service"
+	"WireguardManager/internal/transport/rest/middlewares"
+	"WireguardManager/internal/utility/auth"
 
 	"github.com/gin-gonic/gin"
 )
@@ -48,8 +50,9 @@ func (h *Handler) Init(ginMode string) *gin.Engine {
 func (h *Handler) initApi(router *gin.Engine) {
 
 	api := router.Group("/api")
+	api.Use(middlewares.JwtAuth())
 	{
-		peer := api.Group("/peer")
+		peer := api.Group("/peer", middlewares.AllowWithAny(auth.PeerManager))
 		{
 			peer.GET("/", h.Peer.Get)
 			peer.POST("/", h.Peer.Create)
@@ -59,8 +62,9 @@ func (h *Handler) initApi(router *gin.Engine) {
 
 		server := api.Group("/server")
 		{
-			server.GET("/", h.Server.Get)
-			server.PATCH("/", h.Server.Update)
+			server.GET("/", middlewares.AllowWithAny(auth.PeerManager, auth.ServerManager), h.Server.Get)
+			server.PATCH("/", middlewares.AllowWithAny(auth.ServerManager), h.Server.Update)
 		}
 	}
+
 }
