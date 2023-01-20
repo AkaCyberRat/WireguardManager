@@ -9,6 +9,7 @@ import (
 type RecoverService interface {
 	RecoverServer() error
 	RecoverPeers() error
+	RecoverAll() error
 }
 
 type Recover struct {
@@ -52,6 +53,18 @@ func (r *Recover) RecoverPeers() error {
 				return err
 			}
 		}
+	}
+
+	return nil
+}
+
+func (r *Recover) RecoverAll() error {
+	if err := r.RecoverServer(); err != nil {
+		return err
+	}
+
+	if err := r.RecoverPeers(); err != nil {
+		return err
 	}
 
 	return nil
