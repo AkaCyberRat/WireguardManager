@@ -2,6 +2,7 @@ package rest
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net/http"
 	"time"
@@ -29,7 +30,30 @@ func NewServer(port int, handler http.Handler) *Server {
 	}
 }
 
+type SslDeps struct {
+	CrtPath *string
+	KeyPath *string
+}
+
+func (s *Server) LoadSSL(deps SslDeps) error {
+
+	if deps.CrtPath != nil && deps.KeyPath != nil {
+		cert, err := tls.LoadX509KeyPair(*deps.CrtPath, *deps.KeyPath)
+		if err != nil {
+			return err
+		}
+
+		s.httpServer.TLSConfig = &tls.Config{Certificates: []tls.Certificate{cert}}
+	}
+
+	return nil
+}
+
 func (s *Server) ListenAndServe() error {
+	if s.httpServer.TLSConfig != nil {
+		return s.httpServer.ListenAndServeTLS("", "")
+	}
+
 	return s.httpServer.ListenAndServe()
 }
 
