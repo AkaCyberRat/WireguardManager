@@ -22,11 +22,16 @@ type NetworkTool interface {
 type Tool struct {
 	interfaceName string
 	port          int
-	wg_client     *wgctrl.Client
+	wgClient      *wgctrl.Client
 }
 
 func NewNetworkTool(port int) *Tool {
-	tool := Tool{interfaceName: "wg0", port: port}
+	wgClient, err := wgctrl.New()
+	if err != nil { 
+		panic("can't create wg client")
+	}
+
+	tool := Tool{interfaceName: "wg0", port: port, wgClient: wgClient}
 
 	return &tool
 }
