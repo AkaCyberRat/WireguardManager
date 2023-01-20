@@ -13,6 +13,11 @@ type Configuration struct {
 	RestApi struct {
 		Port    int    `koanf:"port" validate:"required,min=1,max=65535"`
 		GinMode string `koanf:"ginmode" validate:"required,oneof=release debug test"`
+
+		Ssl struct {
+			CrtPath *string `koanf:"crtpath" validate:"required_with=KeyPath"`
+			KeyPath *string `koanf:"keypath" validate:"required_with=CrtPath"`
+		} `koanf:"ssl" validate:"omitempty"`
 	} `koanf:"restapi" validate:"required"`
 
 	Database struct {
@@ -26,14 +31,7 @@ type Configuration struct {
 	} `koanf:"logging" validate:"required"`
 
 	Jwt struct {
-		HS256 struct {
-			Use       *bool  `koanf:"use" validate:"omitempty"`
-			SecretKey string `koanf:"secretkey" validate:"omitempty"`
-		} `koanf:"hs256" validate:"omitempty"`
-
-		RS256 struct {
-			Use        *bool  `koanf:"use" validate:"omitempty"`
-			PubKeyPath string `koanf:"pubkeypath" validate:"omitempty"`
-		} `koanf:"rs256" validate:"omitempty"`
+		HS256SecretKey     *string `koanf:"hs256secretkey" validate:"omitempty"`
+		RS256PublicKeyPath *string `koanf:"rs256publickeypath" validate:"omitempty"`
 	} `koanf:"jwt" validate:"omitempty"`
 }
