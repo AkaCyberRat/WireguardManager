@@ -15,11 +15,11 @@ import (
 )
 
 const (
-	ConfigFilepath = "/app/configs/config.json"
+	ConfigFilepath = "./configs/config.json"
 	EnvPrefix      = "APP_"
 )
 
-func NewConfig() (*Configuration, error) {
+func LoadConfiguration() (*Configuration, error) {
 	//
 	// Create configurator instanse
 	//
@@ -37,9 +37,9 @@ func NewConfig() (*Configuration, error) {
 		"restapi.port":    5000,
 		"restapi.ginmode": "release",
 
-		"dataBase.filepath": "/app/db/service.db",
+		"dataBase.filepath": "./db/service.db",
 
-		"logging.filepath":     "/app/log/logs.txt",
+		"logging.filepath":     "./log/logs.txt",
 		"logging.consolelevel": "info",
 		"logging.filelevel":    "debug",
 	}, "."), nil)
