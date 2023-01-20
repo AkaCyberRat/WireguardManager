@@ -17,10 +17,11 @@ rm -rf /tmp/* /var/lib/apt/lists/* /var/tmp/*
 
 FROM golang:buster AS build
 
-#RUN mkdir /src
+COPY go.* /src/
+WORKDIR /src
+RUN go mod download
 
 COPY . /src
-
 RUN \
 mkdir /app && \
 mkdir /app/deploy && \
@@ -37,7 +38,6 @@ go build -o /app/main main.go
 FROM base AS app
 
 COPY --from=build /app/. /app
-
 RUN \
 cp /app/deploy/coredns.service /etc/systemd/system/coredns.service && \
 systemctl daemon-reload && \
