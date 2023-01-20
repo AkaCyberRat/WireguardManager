@@ -5,37 +5,47 @@ import (
 
 	"WireguardManager/internal/config"
 	"WireguardManager/internal/services"
-	"WireguardManager/internal/transport/rest/middlewares"
 	"WireguardManager/internal/tools/auth"
+	"WireguardManager/internal/transport/rest/middlewares"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
 )
 
 type Deps struct {
 	PeerService   services.PeerService
 	ServerService services.ServerService
 	Configuration config.Configuration
+	AuthTool      auth.AuthTool
 }
 
 type Handler struct {
-	Peer   *PeerHandler
-	Server *ServerHandler
+	PeerHandler   *PeerHandler
+	ServerHandler *ServerHandler
+	JwtHandler    *middlewares.JwtHandler
+	GinMode       string
 }
 
-func NewHandler(deps Deps) *Handler {
-	return &Handler{
-		Peer:   NewPeerHandler(deps.PeerService),
-		Server: NewServerHandler(deps.ServerService, deps.Configuration),
+func NewHandler(deps Deps) *gin.Engine {
+	h := &Handler{
+		PeerHandler:   NewPeerHandler(deps.PeerService),
+		ServerHandler: NewServerHandler(deps.ServerService, deps.Configuration),
+		JwtHandler:    middlewares.NewJwtHandler(deps.AuthTool),
+		GinMode:       deps.Configuration.RestApi.GinMode,
 	}
+
+	return h.init()
 }
 
-func (h *Handler) Init(ginMode string) *gin.Engine {
-	gin.SetMode(ginMode)
+func (h *Handler) init() *gin.Engine {
+	gin.SetMode(h.GinMode)
 
-	router := gin.Default()
+	router := gin.New()
 	router.Use(
 		gin.Recovery(),
-		gin.Logger(),
+		CustomLogger(),
+		//gin.Logger(),
 	)
 
 	router.GET("/ping", func(ctx *gin.Context) {
@@ -49,22 +59,32 @@ func (h *Handler) Init(ginMode string) *gin.Engine {
 
 func (h *Handler) initApi(router *gin.Engine) {
 
-	api := router.Group("/api")
-	api.Use(middlewares.JwtAuth())
+	api := router.Group("/api", h.JwtHandler.Authenticate())
 	{
-		peer := api.Group("/peer", middlewares.AllowWithAny(auth.PeerManager))
+		peer := api.Group("/peer", h.JwtHandler.AllowedRoles(auth.PeerManagerRole))
 		{
-			peer.GET("/", h.Peer.Get)
-			peer.POST("/", h.Peer.Create)
-			peer.PATCH("/", h.Peer.Update)
-			peer.DELETE("/", h.Peer.Delete)
+			peer.GET("/", h.PeerHandler.Get)
+			peer.POST("/", h.PeerHandler.Create)
+			peer.PATCH("/", h.PeerHandler.Update)
+			peer.DELETE("/", h.PeerHandler.Delete)
 		}
 
-		server := api.Group("/server")
+		server := api.Group("/server", h.JwtHandler.AllowedRoles(auth.PeerManagerRole, auth.ServerManagerRole))
 		{
-			server.GET("/", middlewares.AllowWithAny(auth.PeerManager, auth.ServerManager), h.Server.Get)
-			server.PATCH("/", middlewares.AllowWithAny(auth.ServerManager), h.Server.Update)
+			server.GET("/", h.ServerHandler.Get)
+			server.PATCH("/", h.JwtHandler.AllowedRoles(auth.ServerManagerRole), h.ServerHandler.Update)
 		}
 	}
+}
 
+func CustomLogger() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		requestId := uuid.New().String()
+
+		logrus.Debugf("REST Req | %v | %v | %v | %v |", c.Request.RemoteAddr, requestId, c.Request.Method, c.Request.RequestURI)
+
+		c.Next()
+
+		logrus.Debugf("REST Res | %v | %v | %v | %v | %v |", c.Request.RemoteAddr, requestId, c.Request.Method, c.Request.RequestURI, c.Writer.Status())
+	}
 }
