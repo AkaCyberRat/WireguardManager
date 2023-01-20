@@ -16,7 +16,7 @@ type Deps struct {
 	FilePath        string
 }
 
-func PreConfigure() {
+func SetTempConfiguration() {
 	formatter := &nested.Formatter{
 		HideKeys:        true,
 		NoColors:        true,
