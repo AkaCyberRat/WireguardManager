@@ -8,8 +8,21 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func JwtAuth() func(c *gin.Context) {
+type JwtHandler struct {
+	authTool auth.AuthTool
+}
+
+func NewJwtHandler(authTool auth.AuthTool) *JwtHandler {
+	return &JwtHandler{authTool: authTool}
+}
+
+func (h *JwtHandler) Authenticate() func(c *gin.Context) {
 	return func(c *gin.Context) {
+
+		if !h.authTool.IsEnabled() {
+			c.Next()
+			return
+		}
 
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
@@ -25,7 +38,7 @@ func JwtAuth() func(c *gin.Context) {
 			return
 		}
 
-		claims, err := auth.ValidateToken(headerParts[1])
+		claims, err := h.authTool.ValidateToken(headerParts[1])
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 
@@ -38,36 +51,22 @@ func JwtAuth() func(c *gin.Context) {
 	}
 }
 
-func AllowWithAny(allowedScopes ...string) func(c *gin.Context) {
+func (h *JwtHandler) AllowedRoles(roles ...string) func(c *gin.Context) {
 	return func(c *gin.Context) {
+
+		if !h.authTool.IsEnabled() {
+			c.Next()
+			return
+		}
+
 		claims := c.Keys["Claims"].(auth.JwtClaims)
 
-		if !anyMatched(allowedScopes, claims.Scopes) {
+		if !h.authTool.ValidateRoles(roles, claims.Scopes) {
 			c.AbortWithStatusJSON(http.StatusForbidden, nil)
+
 			return
 		}
 
 		c.Next()
 	}
-}
-
-func anyMatched(allowedScopes, receivedScopes []string) bool {
-	if len(allowedScopes) > len(receivedScopes) {
-		return false
-	}
-	for _, e := range allowedScopes {
-		if !contains(receivedScopes, e) {
-			return false
-		}
-	}
-	return true
-}
-
-func contains(list []string, element string) bool {
-	for _, subElement := range list {
-		if subElement == element {
-			return true
-		}
-	}
-	return false
 }
