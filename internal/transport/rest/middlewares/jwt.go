@@ -61,7 +61,7 @@ func (h *JwtHandler) AllowedRoles(roles ...string) func(c *gin.Context) {
 
 		claims := c.Keys["Claims"].(auth.JwtClaims)
 
-		if !h.authTool.ValidateRoles(roles, claims.Scopes) {
+		if !h.authTool.ValidateRoles(roles, claims.Roles) {
 			c.AbortWithStatusJSON(http.StatusForbidden, nil)
 
 			return

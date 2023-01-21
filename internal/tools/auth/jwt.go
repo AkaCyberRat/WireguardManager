@@ -32,7 +32,7 @@ type AuthTool interface {
 
 type JwtClaims struct {
 	jwt.StandardClaims
-	Scopes []string `json:"scopes"`
+	Roles []string `json:"roles"`
 }
 
 //
