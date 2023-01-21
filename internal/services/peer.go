@@ -7,6 +7,8 @@ import (
 	"WireguardManager/internal/core"
 	"WireguardManager/internal/repositories"
 	"WireguardManager/internal/tools/network"
+
+	"github.com/sirupsen/logrus"
 )
 
 type PeerService interface {
@@ -62,6 +64,7 @@ func (s *Peer) Get(ctx context.Context, model *core.GetPeer) (*core.Peer, error)
 		return nil, err
 	}
 
+	logrus.Infof("Peer service get peer Id=%v Ip=%v", peer.Id, peer.Ip)
 	return peer, nil
 }
 
@@ -118,6 +121,7 @@ func (s *Peer) Create(ctx context.Context, model *core.CreatePeer) (*core.Peer, 
 		return nil, err
 	}
 
+	logrus.Infof("Peer service create peer Id=%v Ip=%v", peer.Id, peer.Ip)
 	return peer, nil
 }
 
@@ -197,6 +201,7 @@ func (s *Peer) Update(ctx context.Context, model *core.UpdatePeer) (*core.Peer, 
 		return nil, err
 	}
 
+	logrus.Infof("Peer service update peer Id=%v Ip=%v", peer.Id, peer.Ip)
 	return peer, nil
 }
 
@@ -254,5 +259,6 @@ func (s *Peer) Delete(ctx context.Context, model *core.DeletePeer) (*core.Peer, 
 		return nil, err
 	}
 
+	logrus.Infof("Peer service delete peer Id=%v Ip=%v", peer.Id, peer.Ip)
 	return peer, nil
 }

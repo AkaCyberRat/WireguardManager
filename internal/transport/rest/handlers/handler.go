@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
+	"time"
 
 	"WireguardManager/internal/config"
 	"WireguardManager/internal/services"
@@ -43,9 +45,8 @@ func (h *Handler) init() *gin.Engine {
 
 	router := gin.New()
 	router.Use(
-		gin.Recovery(),
 		CustomLogger(),
-		//gin.Logger(),
+		gin.Recovery(),
 	)
 
 	router.GET("/ping", func(ctx *gin.Context) {
@@ -79,12 +80,29 @@ func (h *Handler) initApi(router *gin.Engine) {
 
 func CustomLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		requestId := uuid.New().String()
 
-		logrus.Debugf("REST Req | %v | %v | %v | %v |", c.Request.RemoteAddr, requestId, c.Request.Method, c.Request.RequestURI)
+		start := time.Now()
+		requestId := uuid.New().String()
+		clientIP := c.ClientIP()
+		method := c.Request.Method
+
+		logrus.Debugf("REST Req | %v | %v | %v | %v |", clientIP, requestId, method, c.Request.RequestURI)
 
 		c.Next()
 
-		logrus.Debugf("REST Res | %v | %v | %v | %v | %v |", c.Request.RemoteAddr, requestId, c.Request.Method, c.Request.RequestURI, c.Writer.Status())
+		latency := time.Since(start)
+		statusCode := c.Writer.Status()
+		errorMessage := c.Errors.ByType(gin.ErrorTypePrivate).String()
+		if latency > time.Minute {
+			latency = latency.Truncate(time.Second)
+		}
+
+		msg := fmt.Sprintf("REST Res | %v | %v | %v | %v | %v | %v | %v ", clientIP, requestId, method, c.Request.RequestURI, latency, statusCode, errorMessage)
+
+		if c.Writer.Status() >= 500 {
+			logrus.Error(msg)
+		} else {
+			logrus.Debug(msg)
+		}
 	}
 }

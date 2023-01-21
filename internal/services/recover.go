@@ -4,6 +4,8 @@ import (
 	"WireguardManager/internal/core"
 	"WireguardManager/internal/repositories"
 	"WireguardManager/internal/tools/network"
+
+	"github.com/sirupsen/logrus"
 )
 
 type RecoverService interface {
@@ -38,6 +40,7 @@ func (r *Recover) RecoverServer() error {
 		}
 	}
 
+	logrus.Infof("Recover service recover server complete.")
 	return nil
 }
 
@@ -55,6 +58,7 @@ func (r *Recover) RecoverPeers() error {
 		}
 	}
 
+	logrus.Infof("Recover service recover peers complete.")
 	return nil
 }
 
@@ -67,5 +71,6 @@ func (r *Recover) RecoverAll() error {
 		return err
 	}
 
+	logrus.Infof("Recover service full recovering complete")
 	return nil
 }

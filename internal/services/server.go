@@ -6,6 +6,8 @@ import (
 	"WireguardManager/internal/core"
 	"WireguardManager/internal/repositories"
 	"WireguardManager/internal/tools/network"
+
+	"github.com/sirupsen/logrus"
 )
 
 type ServerService interface {
@@ -34,6 +36,7 @@ func (s *Server) Get(ctx context.Context) (*core.Server, error) {
 		return err
 	})
 
+	logrus.Infof("Server service get server.")
 	return server, err
 }
 
@@ -91,5 +94,6 @@ func (s *Server) Update(ctx context.Context, model *core.UpdateServer) (*core.Se
 		return nil, err
 	}
 
+	logrus.Infof("Server service update server.")
 	return server, nil
 }
