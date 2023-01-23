@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 
+	"WireguardManager/internal/config"
 	"WireguardManager/internal/core"
 	"WireguardManager/internal/repositories"
 	"WireguardManager/internal/tools/network"
@@ -11,22 +12,37 @@ import (
 )
 
 type ServerService interface {
-	Get(ctx context.Context) (*core.Server, error)
-	Update(ctx context.Context, model *core.UpdateServer) (*core.Server, error)
+	Get(ctx context.Context) (*core.ResponseServer, error)
+	Update(ctx context.Context, model *core.UpdateServer) (*core.ResponseServer, error)
 }
 
 type Server struct {
 	syncService    SyncService
+	recoverService RecoverService
 	serverRepos    repositories.ServerRepository
 	netTool        network.NetworkTool
-	recoverService RecoverService
+	config         config.Configuration
 }
 
-func NewServerService(serverRepos repositories.ServerRepository, netTool network.NetworkTool, syncService SyncService, recoverService RecoverService) *Server {
-	return &Server{serverRepos: serverRepos, netTool: netTool, syncService: syncService, recoverService: recoverService}
+type ServerDeps struct {
+	ServerRepository repositories.ServerRepository
+	SyncService      SyncService
+	RecoverService   RecoverService
+	NetTool          network.NetworkTool
+	Config           config.Configuration
 }
 
-func (s *Server) Get(ctx context.Context) (*core.Server, error) {
+func NewServerService(deps ServerDeps) *Server {
+	return &Server{
+		serverRepos:    deps.ServerRepository,
+		syncService:    deps.SyncService,
+		recoverService: deps.RecoverService,
+		netTool:        deps.NetTool,
+		config:         deps.Config,
+	}
+}
+
+func (s *Server) Get(ctx context.Context) (*core.ResponseServer, error) {
 	var server *core.Server
 
 	err := s.syncService.InServerUseContext(func() error {
@@ -36,11 +52,19 @@ func (s *Server) Get(ctx context.Context) (*core.Server, error) {
 		return err
 	})
 
+	response := core.ResponseServer{
+		HostIp:    s.config.Host.Ip,
+		DnsIp:     network.WgIp,
+		PublicKey: server.PublicKey,
+		Port:      s.config.Wireguard.Port,
+		Enabled:   server.Enabled,
+	}
+
 	logrus.Infof("Server service get server.")
-	return server, err
+	return &response, err
 }
 
-func (s *Server) Update(ctx context.Context, model *core.UpdateServer) (*core.Server, error) {
+func (s *Server) Update(ctx context.Context, model *core.UpdateServer) (*core.ResponseServer, error) {
 	var server *core.Server
 
 	if !model.Validate() {
@@ -94,6 +118,14 @@ func (s *Server) Update(ctx context.Context, model *core.UpdateServer) (*core.Se
 		return nil, err
 	}
 
+	response := core.ResponseServer{
+		HostIp:    s.config.Host.Ip,
+		DnsIp:     network.WgIp,
+		PublicKey: server.PublicKey,
+		Port:      s.config.Wireguard.Port,
+		Enabled:   server.Enabled,
+	}
+
 	logrus.Infof("Server service update server.")
-	return server, nil
+	return &response, nil
 }
