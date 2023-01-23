@@ -10,13 +10,8 @@ var (
 	ErrInternalServer = errors.New("internal server error")
 )
 
-func newResponse(c *gin.Context, status int, obj interface{}) {
-
-	if err, ok := obj.(error); ok {
-		c.JSON(status, ErrorResponse{err.Error()})
-	} else {
-		c.JSON(status, obj)
-	}
+func newErrorResponse(c *gin.Context, status int, err error) {
+	c.JSON(status, ErrorResponse{err.Error()})
 }
 
 type ErrorResponse struct {
