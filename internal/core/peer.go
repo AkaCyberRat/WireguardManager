@@ -84,6 +84,29 @@ func (p *DeletePeer) Validate() bool {
 	return err == nil
 }
 
+type ResponsePeer struct {
+	Id            string
+	PublicKey     string
+	PresharedKey  string
+	DownloadSpeed int
+	UploadSpeed   int
+	Enabled       bool
+}
+
+func (p *ResponsePeer) BindFrom(model *Peer) {
+	p.Id = model.Id
+	p.PublicKey = model.PublicKey
+	p.PresharedKey = model.PresharedKey
+	p.DownloadSpeed = model.DownloadSpeed
+	p.UploadSpeed = model.UploadSpeed
+
+	if model.Status == Enabled {
+		p.Enabled = true
+	} else {
+		p.Enabled = false
+	}
+}
+
 //
 // Errors
 //
