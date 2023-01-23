@@ -18,7 +18,20 @@ func NewPeerHandler(s services.PeerService) *PeerHandler {
 	return &PeerHandler{peerService: s}
 }
 
-// GET peer
+
+// ShowAccount godoc
+// @Summary      Show a peer
+// @Description  get peer by Id
+// @Tags         peer
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  core.Peer
+// @Failure      400  {object}  handlers.ErrorResponse
+// @Failure      401  {object}  handlers.ErrorResponse
+// @Failure      403  {object}  handlers.ErrorResponse
+// @Failure      404  {object}  handlers.ErrorResponse
+// @Failure      500  {object}  handlers.ErrorResponse
+// @Router       /api/peer [get]
 func (h *PeerHandler) Get(c *gin.Context) {
 
 	var model core.GetPeer

@@ -18,6 +18,16 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// @title           Wireguard Manager
+// @version         1.0
+// @description     Description of endpoints for service management.
+
+// @host      localhost:5000
+// @BasePath  /
+
+// @securityDefinitions.apikey ApiKeyAuth
+// @in header
+// @name Authorization
 func main() {
 
 	//
