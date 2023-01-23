@@ -12,10 +12,10 @@ import (
 )
 
 type PeerService interface {
-	Get(ctx context.Context, model *core.GetPeer) (*core.Peer, error)
-	Create(ctx context.Context, model *core.CreatePeer) (*core.Peer, error)
-	Update(ctx context.Context, model *core.UpdatePeer) (*core.Peer, error)
-	Delete(ctx context.Context, model *core.DeletePeer) (*core.Peer, error)
+	Get(ctx context.Context, model *core.GetPeer) (*core.ResponsePeer, error)
+	Create(ctx context.Context, model *core.CreatePeer) (*core.ResponsePeer, error)
+	Update(ctx context.Context, model *core.UpdatePeer) (*core.ResponsePeer, error)
+	Delete(ctx context.Context, model *core.DeletePeer) error
 }
 
 // PeerService interface implementation
@@ -35,7 +35,7 @@ func NewPeerService(serverRepository repositories.ServerRepository, peerRep repo
 	}
 }
 
-func (s *Peer) Get(ctx context.Context, model *core.GetPeer) (*core.Peer, error) {
+func (s *Peer) Get(ctx context.Context, model *core.GetPeer) (*core.ResponsePeer, error) {
 	if !model.Validate() {
 		return nil, core.ErrModelValidation
 	}
@@ -64,11 +64,14 @@ func (s *Peer) Get(ctx context.Context, model *core.GetPeer) (*core.Peer, error)
 		return nil, err
 	}
 
+	response := core.ResponsePeer{}
+	response.BindFrom(peer)
+
 	logrus.Infof("Peer service get peer Id=%v Ip=%v", peer.Id, peer.Ip)
-	return peer, nil
+	return &response, nil
 }
 
-func (s *Peer) Create(ctx context.Context, model *core.CreatePeer) (*core.Peer, error) {
+func (s *Peer) Create(ctx context.Context, model *core.CreatePeer) (*core.ResponsePeer, error) {
 	var peer *core.Peer
 
 	if !model.Validate() {
@@ -121,11 +124,14 @@ func (s *Peer) Create(ctx context.Context, model *core.CreatePeer) (*core.Peer, 
 		return nil, err
 	}
 
+	response := core.ResponsePeer{}
+	response.BindFrom(peer)
+
 	logrus.Infof("Peer service create peer Id=%v Ip=%v", peer.Id, peer.Ip)
-	return peer, nil
+	return &response, nil
 }
 
-func (s *Peer) Update(ctx context.Context, model *core.UpdatePeer) (*core.Peer, error) {
+func (s *Peer) Update(ctx context.Context, model *core.UpdatePeer) (*core.ResponsePeer, error) {
 	var peer *core.Peer
 
 	if !model.Validate() {
@@ -201,15 +207,18 @@ func (s *Peer) Update(ctx context.Context, model *core.UpdatePeer) (*core.Peer, 
 		return nil, err
 	}
 
+	response := core.ResponsePeer{}
+	response.BindFrom(peer)
+
 	logrus.Infof("Peer service update peer Id=%v Ip=%v", peer.Id, peer.Ip)
-	return peer, nil
+	return &response, nil
 }
 
-func (s *Peer) Delete(ctx context.Context, model *core.DeletePeer) (*core.Peer, error) {
+func (s *Peer) Delete(ctx context.Context, model *core.DeletePeer) (error) {
 	var peer *core.Peer
 
 	if !model.Validate() {
-		return nil, core.ErrModelValidation
+		return core.ErrModelValidation
 	}
 
 	err := s.syncService.InServerUseContext(func() error {
@@ -256,9 +265,9 @@ func (s *Peer) Delete(ctx context.Context, model *core.DeletePeer) (*core.Peer, 
 	})
 
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	logrus.Infof("Peer service delete peer Id=%v Ip=%v", peer.Id, peer.Ip)
-	return peer, nil
+	return nil
 }
