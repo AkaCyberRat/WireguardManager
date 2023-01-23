@@ -1,0 +1,122 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "Description of endpoints for service management.",
+        "title": "Wireguard Manager",
+        "contact": {},
+        "version": "1.0"
+    },
+    "host": "localhost:5000",
+    "basePath": "/",
+    "paths": {
+        "/api/peer": {
+            "get": {
+                "description": "get peer by Id",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "peer"
+                ],
+                "summary": "Show a peer",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Peer"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "core.Peer": {
+            "type": "object",
+            "properties": {
+                "downloadSpeed": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "ip": {
+                    "type": "string"
+                },
+                "presharedKey": {
+                    "type": "string"
+                },
+                "publicKey": {
+                    "type": "string"
+                },
+                "status": {
+                    "$ref": "#/definitions/core.Status"
+                },
+                "uploadSpeed": {
+                    "type": "integer"
+                }
+            }
+        },
+        "core.Status": {
+            "type": "string",
+            "enum": [
+                "unused",
+                "enabled",
+                "disabled"
+            ],
+            "x-enum-varnames": [
+                "Unused",
+                "Enabled",
+                "Disabled"
+            ]
+        },
+        "handlers.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "ApiKeyAuth": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
+    }
+}

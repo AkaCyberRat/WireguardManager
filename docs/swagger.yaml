@@ -1,0 +1,82 @@
+basePath: /
+definitions:
+  core.Peer:
+    properties:
+      downloadSpeed:
+        type: integer
+      id:
+        type: string
+      ip:
+        type: string
+      presharedKey:
+        type: string
+      publicKey:
+        type: string
+      status:
+        $ref: '#/definitions/core.Status'
+      uploadSpeed:
+        type: integer
+    type: object
+  core.Status:
+    enum:
+    - unused
+    - enabled
+    - disabled
+    type: string
+    x-enum-varnames:
+    - Unused
+    - Enabled
+    - Disabled
+  handlers.ErrorResponse:
+    properties:
+      error:
+        type: string
+    type: object
+host: localhost:5000
+info:
+  contact: {}
+  description: Description of endpoints for service management.
+  title: Wireguard Manager
+  version: "1.0"
+paths:
+  /api/peer:
+    get:
+      consumes:
+      - application/json
+      description: get peer by Id
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Peer'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Show a peer
+      tags:
+      - peer
+securityDefinitions:
+  ApiKeyAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
