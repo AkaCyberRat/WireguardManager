@@ -36,16 +36,6 @@ type JwtClaims struct {
 }
 
 //
-// Errors
-//
-
-var (
-	ErrInvalidToken  = fmt.Errorf("invalid token")
-	ErrTokenExpired  = fmt.Errorf("token expired")
-	ErrInvalidClaims = fmt.Errorf("invalid claims")
-)
-
-//
 // Tool implemantation
 //
 
@@ -142,3 +132,13 @@ func GetRsaPublicKey(filePath string) (*rsa.PublicKey, error) {
 
 	return pubKey, nil
 }
+
+//
+// Errors
+//
+
+var (
+	ErrInvalidToken  = fmt.Errorf("invalid token")
+	ErrTokenExpired  = fmt.Errorf("token expired")
+	ErrInvalidClaims = fmt.Errorf("invalid claims")
+)
