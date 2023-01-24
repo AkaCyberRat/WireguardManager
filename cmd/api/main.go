@@ -71,6 +71,7 @@ func main() {
 		NetTool:          netTool,
 		PeerRepository:   repositories.PeerRepository,
 		ServerRepository: repositories.ServerRepository,
+		Config:           *conf,
 	})
 
 	// Create jwt auth tool
@@ -80,7 +81,7 @@ func main() {
 	handlers := handlers.NewHandler(handlers.Deps{
 		PeerService:   services.PeerService,
 		ServerService: services.ServerService,
-		Configuration: *conf,
+		Config:        *conf,
 		AuthTool:      authTool,
 	})
 

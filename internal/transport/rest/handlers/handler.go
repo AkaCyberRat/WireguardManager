@@ -18,8 +18,8 @@ import (
 type Deps struct {
 	PeerService   services.PeerService
 	ServerService services.ServerService
-	Configuration config.Configuration
 	AuthTool      auth.AuthTool
+	Config        config.Configuration
 }
 
 type Handler struct {
@@ -32,9 +32,9 @@ type Handler struct {
 func NewHandler(deps Deps) *gin.Engine {
 	h := &Handler{
 		PeerHandler:   NewPeerHandler(deps.PeerService),
-		ServerHandler: NewServerHandler(deps.ServerService, deps.Configuration),
+		ServerHandler: NewServerHandler(deps.ServerService),
 		JwtHandler:    middlewares.NewJwtHandler(deps.AuthTool),
-		GinMode:       deps.Configuration.RestApi.GinMode,
+		GinMode:       deps.Config.RestApi.GinMode,
 	}
 
 	return h.init()
@@ -101,8 +101,10 @@ func CustomLogger() gin.HandlerFunc {
 
 		if c.Writer.Status() >= 500 {
 			logrus.Error(msg)
-		} else {
-			logrus.Debug(msg)
+
+			return
 		}
+
+		logrus.Debug(msg)
 	}
 }
