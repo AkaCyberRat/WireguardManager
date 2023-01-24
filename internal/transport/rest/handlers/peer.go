@@ -5,6 +5,7 @@ import (
 
 	"WireguardManager/internal/core"
 	"WireguardManager/internal/services"
+	"WireguardManager/internal/transport/rest"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -35,7 +36,7 @@ func (h *PeerHandler) Get(c *gin.Context) {
 
 	var model core.GetPeer
 	if err := c.BindJSON(&model); err != nil {
-		newErrorResponse(c, http.StatusBadRequest, err)
+		rest.NewErrorResponse(c, http.StatusBadRequest, rest.ErrImpossibleToBindModel)
 
 		return
 	}
@@ -43,24 +44,24 @@ func (h *PeerHandler) Get(c *gin.Context) {
 	peer, err := h.peerService.Get(c.Request.Context(), &model)
 	if err != nil {
 		if err == core.ErrModelValidation {
-			newErrorResponse(c, http.StatusBadRequest, err)
+			rest.NewErrorResponse(c, http.StatusBadRequest, err)
 
 			return
 		}
 
 		if err == core.ErrPeerNotFound {
-			newErrorResponse(c, http.StatusNotFound, err)
+			rest.NewErrorResponse(c, http.StatusNotFound, err)
 
 			return
 		}
 
 		logrus.Error("Get peer internal error: ", err.Error())
-		newErrorResponse(c, http.StatusInternalServerError, ErrInternalServer)
+		rest.NewErrorResponse(c, http.StatusInternalServerError, rest.ErrInternalServer)
 
 		return
 	}
 
-	newErrorResponse(c, http.StatusOK, peer)
+	c.JSON(http.StatusOK, peer)
 }
 
 // POST peer
@@ -68,25 +69,25 @@ func (h *PeerHandler) Create(c *gin.Context) {
 
 	var model core.CreatePeer
 	if err := c.BindJSON(&model); err != nil {
-		newErrorResponse(c, http.StatusBadRequest, err)
+		rest.NewErrorResponse(c, http.StatusBadRequest, rest.ErrImpossibleToBindModel)
 		return
 	}
 
 	peer, err := h.peerService.Create(c.Request.Context(), &model)
 	if err != nil {
 		if err == core.ErrModelValidation {
-			newErrorResponse(c, http.StatusBadRequest, err)
+			rest.NewErrorResponse(c, http.StatusBadRequest, err)
 
 			return
 		}
 
 		if err == core.ErrPeerLimitReached {
-			newErrorResponse(c, http.StatusForbidden, err)
+			rest.NewErrorResponse(c, http.StatusForbidden, err)
 			return
 		}
 
 		logrus.Error("Create peer internal error: ", err.Error())
-		newErrorResponse(c, http.StatusInternalServerError, ErrInternalServer)
+		rest.NewErrorResponse(c, http.StatusInternalServerError, rest.ErrInternalServer)
 		return
 	}
 
@@ -98,26 +99,26 @@ func (h *PeerHandler) Update(c *gin.Context) {
 
 	var model core.UpdatePeer
 	if err := c.BindJSON(&model); err != nil {
-		newErrorResponse(c, http.StatusBadRequest, err.Error())
+		rest.NewErrorResponse(c, http.StatusBadRequest, rest.ErrImpossibleToBindModel)
 		return
 	}
 
 	peer, err := h.peerService.Update(c.Request.Context(), &model)
 	if err != nil {
 		if err == core.ErrModelValidation {
-			newErrorResponse(c, http.StatusBadRequest, err)
+			rest.NewErrorResponse(c, http.StatusBadRequest, err)
 
 			return
 		}
 
 		if err == core.ErrPeerNotFound {
-			newErrorResponse(c, http.StatusNotFound, err)
+			rest.NewErrorResponse(c, http.StatusNotFound, err)
 
 			return
 		}
 
 		logrus.Error("Update peer internal error: ", err.Error())
-		newErrorResponse(c, http.StatusInternalServerError, ErrInternalServer)
+		rest.NewErrorResponse(c, http.StatusInternalServerError, rest.ErrInternalServer)
 		return
 	}
 
@@ -129,26 +130,26 @@ func (h *PeerHandler) Delete(c *gin.Context) {
 
 	var model core.DeletePeer
 	if err := c.BindJSON(&model); err != nil {
-		newErrorResponse(c, http.StatusBadRequest, err.Error())
+		rest.NewErrorResponse(c, http.StatusBadRequest, rest.ErrImpossibleToBindModel)
 		return
 	}
 
 	err := h.peerService.Delete(c.Request.Context(), &model)
 	if err != nil {
 		if err == core.ErrModelValidation {
-			newErrorResponse(c, http.StatusBadRequest, err)
+			rest.NewErrorResponse(c, http.StatusBadRequest, err)
 
 			return
 		}
 
 		if err == core.ErrPeerNotFound {
-			newErrorResponse(c, http.StatusNotFound, err)
+			rest.NewErrorResponse(c, http.StatusNotFound, err)
 
 			return
 		}
 
 		logrus.Error("Delete peer internal error: ", err.Error())
-		newErrorResponse(c, http.StatusInternalServerError, ErrInternalServer)
+		rest.NewErrorResponse(c, http.StatusInternalServerError, rest.ErrInternalServer)
 		return
 	}
 
