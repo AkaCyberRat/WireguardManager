@@ -3,22 +3,20 @@ package handlers
 import (
 	"net/http"
 
-	"WireguardManager/internal/config"
 	"WireguardManager/internal/core"
 	"WireguardManager/internal/services"
-	"WireguardManager/internal/tools/network"
+	"WireguardManager/internal/transport/rest"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 )
 
 type ServerHandler struct {
-	Configuration config.Configuration
 	serverService services.ServerService
 }
 
-func NewServerHandler(serverService services.ServerService, configuration config.Configuration) *ServerHandler {
-	return &ServerHandler{serverService: serverService, Configuration: configuration}
+func NewServerHandler(serverService services.ServerService) *ServerHandler {
+	return &ServerHandler{serverService: serverService}
 }
 
 // GET server
@@ -27,27 +25,19 @@ func (h *ServerHandler) Get(c *gin.Context) {
 	server, err := h.serverService.Get(c.Request.Context())
 	if err != nil {
 		logrus.Error("Get server internal error: ", err.Error())
-		newResponse(c, http.StatusInternalServerError, ErrInternalServer)
+		rest.NewErrorResponse(c, http.StatusInternalServerError, rest.ErrInternalServer)
 
 		return
 	}
 
-	responseModel := core.ResponseServer{
-		HostIp:    h.Configuration.Host.Ip,
-		DnsIp:     network.WgIp,
-		PublicKey: server.PublicKey,
-		Port:      h.Configuration.Wireguard.Port,
-		Enabled:   server.Enabled,
-	}
-
-	newResponse(c, http.StatusOK, responseModel)
+	c.JSON(http.StatusOK, server)
 }
 
 // PATCH server
 func (h *ServerHandler) Update(c *gin.Context) {
 	var model core.UpdateServer
 	if err := c.BindJSON(&model); err != nil {
-		newResponse(c, http.StatusBadRequest, err)
+		rest.NewErrorResponse(c, http.StatusBadRequest, rest.ErrImpossibleToBindModel)
 
 		return
 	}
@@ -55,24 +45,16 @@ func (h *ServerHandler) Update(c *gin.Context) {
 	server, err := h.serverService.Update(c.Request.Context(), &model)
 	if err != nil {
 		if err == core.ErrModelValidation {
-			newResponse(c, http.StatusBadRequest, err)
+			rest.NewErrorResponse(c, http.StatusBadRequest, err)
 
 			return
 		}
 
 		logrus.Error("Update server internal error: ", err.Error())
-		newResponse(c, http.StatusInternalServerError, ErrInternalServer)
+		rest.NewErrorResponse(c, http.StatusInternalServerError, rest.ErrInternalServer)
 
 		return
 	}
 
-	responseModel := core.ResponseServer{
-		HostIp:    h.Configuration.Host.Ip,
-		DnsIp:     network.WgIp,
-		PublicKey: server.PublicKey,
-		Port:      h.Configuration.Wireguard.Port,
-		Enabled:   server.Enabled,
-	}
-
-	newResponse(c, http.StatusOK, responseModel)
+	c.JSON(http.StatusOK, server)
 }
