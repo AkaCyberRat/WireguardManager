@@ -28,7 +28,6 @@ mkdir /app/deploy && \
 mkdir /app/configs && \
 \
 cp -a /src/deploy/. /app/deploy && \
-cp -a /src/configs/. /app/configs && \
 \
 cd /src/cmd/api && \
 go build -o /app/main main.go 
