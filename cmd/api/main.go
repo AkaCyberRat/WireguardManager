@@ -19,6 +19,8 @@ import (
 )
 
 func main() {
+	// Test CI changes jjj
+
 	//
 	// Preconfigure logger
 	//
