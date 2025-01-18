@@ -15,7 +15,7 @@ type Repositories struct {
 }
 
 func NewRepositories(db *gorm.DB) *Repositories {
-	db.AutoMigrate(models.Peer{}, models.Server{})
+	_ = db.AutoMigrate(models.Peer{}, models.Server{})
 
 	repositories := Repositories{
 		PeerRepository:   NewSqlitePeerRepository(db),
