@@ -19,8 +19,6 @@ import (
 )
 
 func main() {
-	// Test
-	a
 	//
 	// Preconfigure logger
 	//
