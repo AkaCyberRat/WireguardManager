@@ -23,3 +23,10 @@ exmpl_run: b_exp
 	
 	 ./.bin/example/main
 
+
+lint-check:
+	golangci-lint run ./... --config .golangci.yml
+
+
+lint-fix:
+	golangci-lint run ./... --config .golangci.yml --fix

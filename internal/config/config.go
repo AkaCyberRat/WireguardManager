@@ -21,7 +21,7 @@ const (
 
 func NewConfig() (*Configuration, error) {
 	//
-	// Create configurator instanse
+	// Create configurator instances
 	//
 	configurator := koanf.New(".")
 

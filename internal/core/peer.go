@@ -34,7 +34,7 @@ const (
 
 type GetPeer struct {
 	Id string `validate:"required"`
-	//PublicKey string `validate:"requred,base64"`
+	//PublicKey string `validate:"required,base64"`
 }
 
 func (p *GetPeer) Validate() bool {
