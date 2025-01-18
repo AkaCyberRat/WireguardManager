@@ -1,0 +1,12 @@
+linters:
+  enable:
+    - gofmt
+    - govet
+    - golint
+    - ineffassign
+    - misspell
+    - staticcheck
+    - unused
+    - errcheck
+    - deadcode
+    - gosec
