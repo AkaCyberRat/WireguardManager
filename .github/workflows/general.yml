@@ -1,5 +1,3 @@
-# Changes for test
-
 name: "Golang CI"
 
 on: [pull_request]
