@@ -19,7 +19,7 @@ api_run_docker_dev:
 exmpl_build: 
 	go mod download && mkdir -p ./.bin/example && go build -o ./.bin/example ./cmd/example/main.go
 
-exmpl_run: b_exp 
+exmpl_run: exmpl_build
 	
 	 ./.bin/example/main
 
