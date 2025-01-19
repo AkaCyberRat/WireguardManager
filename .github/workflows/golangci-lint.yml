@@ -7,7 +7,7 @@ on:
 
 jobs:
   lint:
-    name: Lint
+    name: "GolangCI Lint"
     runs-on: ubuntu-latest
 
     steps:
