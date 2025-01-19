@@ -1,4 +1,4 @@
-name: "Golang CII"
+name: "Golang CI"
 
 on: [pull_request]
 
