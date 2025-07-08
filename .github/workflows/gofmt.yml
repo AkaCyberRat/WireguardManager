@@ -1,0 +1,17 @@
+name: "Gofmt Lint"
+
+on: [pull_request]
+
+jobs:
+  lint:
+    name: "Gofmt Lint"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.23'
+      - name: Lint Go files
+        run: gofmt -e .

@@ -1,4 +1,11 @@
-.*
+.idea/
+.bin/
+.database/
+.tests/
+example/
+
+
+.env
 *.dev
 
 !.dockerignore
