@@ -3,7 +3,7 @@ package core
 import (
 	"errors"
 
-	"github.com/go-playground/validator/v10"
+	validator "github.com/go-playground/validator/v10"
 )
 
 //
@@ -34,7 +34,7 @@ const (
 
 type GetPeer struct {
 	Id string `validate:"required"`
-	//PublicKey string `validate:"required,base64"`
+	// PublicKey string `validate:"required,base64"`
 }
 
 func (p *GetPeer) Validate() bool {
@@ -75,7 +75,7 @@ func (p *UpdatePeer) Validate() bool {
 
 type DeletePeer struct {
 	Id string `validate:"required"`
-	//PublicKey string
+	// PublicKey string
 }
 
 func (p *DeletePeer) Validate() bool {
