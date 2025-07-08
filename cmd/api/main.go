@@ -8,33 +8,39 @@ import (
 
 	"WireguardManager/internal/config"
 	"WireguardManager/internal/logging"
-	storage "WireguardManager/internal/repository/sqlite"
-	"WireguardManager/internal/service"
+	"WireguardManager/internal/repositories/sqlite"
+	"WireguardManager/internal/services"
+	"WireguardManager/internal/tools/auth"
+	"WireguardManager/internal/tools/network"
 	"WireguardManager/internal/transport/rest"
-	"WireguardManager/internal/transport/rest/handler"
-	"WireguardManager/internal/utility/network"
+	"WireguardManager/internal/transport/rest/handlers"
 
 	"github.com/sirupsen/logrus"
-	"gorm.io/gorm"
 )
 
+// @title           Wireguard Manager
+// @version         1.0
+// @description     Description of endpoints for service management.
+
+// @host      localhost:5000
+// @BasePath  /
+
+// @securityDefinitions.apikey ApiKeyAuth
+// @in header
+// @name Authorization
 func main() {
-	//
-	// Preconfigure logger
-	//
-	logging.PreConfigure()
 
 	//
-	// Load new configuration from env variables and config files
+	// 		PREPARE LOGGING AND CONFIGURATION
 	//
-	conf, err := config.NewConfig()
+
+	logging.SetTempConfiguration()
+
+	conf, err := config.LoadConfiguration()
 	if err != nil {
 		logrus.Fatal("Config error: ", err.Error())
 	}
 
-	//
-	// Configure logger with new configuration
-	//
 	err = logging.Configure(logging.Deps{
 		ConsoleLogLevel: conf.Logging.ConsoleLevel,
 		FileLogLevel:    conf.Logging.FileLevel,
@@ -45,82 +51,101 @@ func main() {
 	}
 
 	//
-	// Connect database
+	// 		CREATE PARTS and INJECT DEPENDENCIES
 	//
-	db, err := gorm.Open(storage.NewSqliteConnection(conf.Database.FilePath), &gorm.Config{})
+
+	// Connect to database
+	db, err := sqlite.NewSqliteDb(conf.Database.FilePath)
 	if err != nil {
-		logrus.Fatal("Db error:", err.Error())
+		logrus.Fatal("Failed to connect db:", err.Error())
 	}
 
-	//
-	// Init NetworkTool for driving Wireguard interface and TrafficControl tool
-	//
+	// Create repositories
+	repositories := sqlite.NewRepositories(db)
+
+	// Create NetworkTool for driving Wireguard interface and TrafficControl tool
 	netTool := network.NewNetworkTool(conf.Wireguard.Port)
 
+	// Create services
+	services := services.NewServices(services.Deps{
+		NetTool:          netTool,
+		PeerRepository:   repositories.PeerRepository,
+		ServerRepository: repositories.ServerRepository,
+		Config:           *conf,
+	})
+
+	// Create jwt auth tool
+	authTool := auth.NewJwtAuthTool()
+
+	// Create REST api handlers
+	handlers := handlers.NewHandler(handlers.Deps{
+		PeerService:   services.PeerService,
+		ServerService: services.ServerService,
+		Config:        *conf,
+		AuthTool:      authTool,
+	})
+
+	// Create REST api server
+	restServer := rest.NewServer(conf.RestApi.Port, handlers)
+
 	//
-	// Create and prepare repositories
+	// 		PREPARE TO LAUNCH (INITIALIZATION)
 	//
-	repositories := storage.NewRepositories(db)
-	repositoriesInitDeps := storage.InitDeps{
+
+	// Init repositories
+	if err = repositories.Init(sqlite.InitDeps{
 		NetTool:          netTool,
 		WireguardPort:    conf.Wireguard.Port,
 		WireguardEnabled: true,
 		PeerCount:        conf.Wireguard.PeerLimit,
-	}
-	if err = repositories.Init(repositoriesInitDeps); err != nil {
+	}); err != nil {
 		logrus.Fatal("Repository error:", err.Error())
 	}
 
-	//
-	// Init services
-	//
-	services := service.NewServices(service.Deps{
-		NetTool:          netTool,
-		PeerRepository:   repositories.PeerRepository,
-		ServerRepository: repositories.ServerRepository,
-	})
-	if err := services.RecoverService.RecoverServer(); err != nil {
-		logrus.Fatal("Failed to recover server: ", err.Error())
-	}
-	if err := services.RecoverService.RecoverPeers(); err != nil {
-		logrus.Fatal("Failed to recover peers: ", err.Error())
+	// Recover app runtime state from data models
+	if err := services.RecoverService.RecoverAll(); err != nil {
+		logrus.Fatal("Failed to recover state:", err.Error())
 	}
 
-	//
-	// Init REST API endpoint handlers
-	//
-	handler := handler.NewHandler(handler.Deps{
-		PeerService:   services.PeerService,
-		ServerService: services.ServerService,
-		Configuration: *conf,
-	}).Init(conf.RestApi.GinMode)
+	// Load jwt keys to auth tokens
+	if err = authTool.LoadJwtKeys(auth.KeysDeps{
+		HS256SecretKey:     conf.Jwt.HS256SecretKey,
+		RS256PublicKeyPath: conf.Jwt.RS256PublicKeyPath,
+	}); err != nil {
+		logrus.Fatal("Failed to load jwt keys:", err.Error())
+	}
+
+	// Load SSL cert to REST https
+	if err = restServer.LoadSSL(rest.SslDeps{
+		CrtPath: conf.RestApi.Ssl.CrtPath,
+		KeyPath: conf.RestApi.Ssl.KeyPath,
+	}); err != nil {
+		logrus.Fatal("Failed to load SSL:", err.Error())
+	}
 
 	//
-	// Init REST API server
+	// 		LAUNCH APP
 	//
-	restServer := rest.NewServer(conf.RestApi.Port, handler)
 
-	//
-	// Run REST API server
-	//
+	// Run REST api http server
 	go func() {
 		logrus.Info("Starting REST api server")
 		if err := restServer.ListenAndServe(); err != nil {
-			logrus.Fatal("rest listen and serve error: ", err.Error())
+			logrus.Fatal("Rest listen and serve error: ", err.Error())
 		}
 	}()
 
 	//
-	// Waiting for exit
+	// 		WAITING FOR EXIT
 	//
+
+	// Wait signal
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
 	<-quit
 	logrus.Info("Shutting down server")
 
-	//
-	// Shutdown REST API server
-	//
+	// Shutdown REST api server
 	if err = restServer.Stop(context.Background()); err != nil {
 		logrus.Errorf("error occurred on rest server shutting down: %s", err.Error())
 	}

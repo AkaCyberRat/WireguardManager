@@ -5,21 +5,22 @@ import (
 	"os"
 	"strings"
 
-	"github.com/go-playground/validator/v10"
+	validator "github.com/go-playground/validator/v10"
 	"github.com/knadh/koanf"
 	"github.com/knadh/koanf/parsers/json"
 	"github.com/knadh/koanf/providers/confmap"
 	"github.com/knadh/koanf/providers/env"
 	"github.com/knadh/koanf/providers/file"
 	"github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v3"
 )
 
 const (
-	ConfigFilepath = "/app/configs/config.json"
+	ConfigFilepath = "./configs/config.json"
 	EnvPrefix      = "APP_"
 )
 
-func NewConfig() (*Configuration, error) {
+func LoadConfiguration() (*Configuration, error) {
 	//
 	// Create configurator instances
 	//
@@ -29,17 +30,13 @@ func NewConfig() (*Configuration, error) {
 	// (First layer) Set default values
 	//
 	err := configurator.Load(confmap.Provider(map[string]interface{}{
-		"host.ip": "127.0.0.1",
-
-		"wireguard.port":      51820,
-		"wireguard.peerlimit": 100,
-
-		"restapi.port":    5000,
-		"restapi.ginmode": "release",
-
-		"dataBase.filepath": "/app/db/service.db",
-
-		"logging.filepath":     "/app/log/logs.txt",
+		"host.ip":              "127.0.0.1",
+		"wireguard.port":       51820,
+		"wireguard.peerlimit":  100,
+		"restapi.port":         5000,
+		"restapi.ginmode":      "release",
+		"dataBase.filepath":    "./db/service.db",
+		"logging.filepath":     "./log/logs.txt",
 		"logging.consolelevel": "info",
 		"logging.filelevel":    "debug",
 	}, "."), nil)
@@ -56,7 +53,7 @@ func NewConfig() (*Configuration, error) {
 		logrus.Info("User configuration has been read.")
 
 	} else if os.IsNotExist(err) {
-		logrus.Warn("User configuration file wasn't found. (Default settings applied)")
+		logrus.Warn("User configuration file wasn't found.")
 
 	} else {
 		return nil, fmt.Errorf("failed to read user configuration file: %v", err.Error())
@@ -69,6 +66,7 @@ func NewConfig() (*Configuration, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to load environment variables: %v", err.Error())
 	}
+	logrus.Info("Env variables have been read.")
 
 	//
 	// Unmarshal app config
@@ -87,6 +85,8 @@ func NewConfig() (*Configuration, error) {
 		return nil, fmt.Errorf("config validation failed: %v", err.Error())
 	}
 
+	showConfiguration(config)
+
 	return &config, nil
 }
 
@@ -94,4 +94,15 @@ func convertEnvVarName(s string) string {
 
 	return strings.Replace(
 		strings.ToLower(strings.TrimPrefix(s, EnvPrefix)), "_", ".", -1)
+}
+
+func showConfiguration(conf Configuration) {
+	bytes, _ := yaml.Marshal(conf)
+	strs := strings.Split(string(bytes), "\n")
+
+	logrus.Infof("Current configuration:\n")
+	for _, v := range strs[:len(strs)-2] {
+		logrus.Infof("%s", v)
+	}
+	logrus.Infof("%s\n", strs[len(strs)-2])
 }

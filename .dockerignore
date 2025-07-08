@@ -1,0 +1,10 @@
+.dockerignore
+**/Dockerfile
+**/docker-compose.yml*
+
+.gitignore
+Makefile
+README.md
+docs/
+**/*.dev
+**/.*

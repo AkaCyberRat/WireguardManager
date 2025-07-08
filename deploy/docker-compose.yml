@@ -1,7 +1,8 @@
 version: '3.2'
 
 services:
-  dev_wg_control:
+  wireguard_manager:
+    image: akacyberrat/wireguard_manager
     build:
       context: ../
       dockerfile: ./deploy/Dockerfile

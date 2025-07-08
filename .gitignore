@@ -8,3 +8,5 @@ example/
 .env
 *.dev
 
+!.dockerignore
+

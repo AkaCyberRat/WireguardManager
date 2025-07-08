@@ -2,7 +2,7 @@ package sqlite
 
 import (
 	"WireguardManager/internal/core"
-	"WireguardManager/internal/repository/sqlite/models"
+	"WireguardManager/internal/repositories/sqlite/models"
 
 	"gorm.io/gorm"
 )

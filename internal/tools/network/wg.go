@@ -7,7 +7,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/vishvananda/netlink"
-	"golang.zx2c4.com/wireguard/wgctrl"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
@@ -18,13 +17,6 @@ const (
 
 func (t *Tool) wgServerUp(privateKey string) error {
 	var err error
-
-	if t.wg_client == nil {
-		t.wg_client, err = wgctrl.New()
-		if err != nil {
-			return err
-		}
-	}
 
 	// Create wg interface
 	if isWgExists(t.interfaceName) {
@@ -76,7 +68,7 @@ func (t *Tool) wgServerUp(privateKey string) error {
 		return err
 	}
 
-	if err = t.wg_client.ConfigureDevice(t.interfaceName, config); err != nil {
+	if err = t.wgClient.ConfigureDevice(t.interfaceName, config); err != nil {
 		return err
 	}
 
@@ -139,7 +131,7 @@ func (t *Tool) wgPeerUp(ip string, publicKey string, presharedKey string) error 
 	}
 
 	peers := []wgtypes.PeerConfig{peer}
-	if err = t.wg_client.ConfigureDevice(t.interfaceName, wgtypes.Config{Peers: peers}); err != nil {
+	if err = t.wgClient.ConfigureDevice(t.interfaceName, wgtypes.Config{Peers: peers}); err != nil {
 		return err
 	}
 
@@ -166,7 +158,7 @@ func (t *Tool) wgPeerDown(ip string, publicKey string) error {
 	}
 
 	peers := []wgtypes.PeerConfig{peer}
-	if err = t.wg_client.ConfigureDevice(t.interfaceName, wgtypes.Config{Peers: peers}); err != nil {
+	if err = t.wgClient.ConfigureDevice(t.interfaceName, wgtypes.Config{Peers: peers}); err != nil {
 		return err
 	}
 

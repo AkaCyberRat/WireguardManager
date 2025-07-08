@@ -2,8 +2,8 @@ package sqlite
 
 import (
 	"WireguardManager/internal/core"
-	"WireguardManager/internal/repository/sqlite/models"
-	"WireguardManager/internal/utility/network"
+	"WireguardManager/internal/repositories/sqlite/models"
+	"WireguardManager/internal/tools/network"
 	"fmt"
 
 	"gorm.io/gorm"
