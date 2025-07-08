@@ -214,7 +214,7 @@ func (s *Peer) Update(ctx context.Context, model *core.UpdatePeer) (*core.Respon
 	return &response, nil
 }
 
-func (s *Peer) Delete(ctx context.Context, model *core.DeletePeer) (error) {
+func (s *Peer) Delete(ctx context.Context, model *core.DeletePeer) error {
 	var peer *core.Peer
 
 	if !model.Validate() {

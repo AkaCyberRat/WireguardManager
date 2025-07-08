@@ -22,7 +22,7 @@ const (
 
 func LoadConfiguration() (*Configuration, error) {
 	//
-	// Create configurator instanse
+	// Create configurator instances
 	//
 	configurator := koanf.New(".")
 

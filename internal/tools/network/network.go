@@ -27,7 +27,7 @@ type Tool struct {
 
 func NewNetworkTool(port int) *Tool {
 	wgClient, err := wgctrl.New()
-	if err != nil { 
+	if err != nil {
 		panic("can't create wg client")
 	}
 
