@@ -3,9 +3,13 @@ version: '3.2'
 services:
   wireguard_manager:
     image: akacyberrat/wireguard_manager
+
     build:
-      context: ../
-      dockerfile: ./deploy/Dockerfile
+      context: ../../
+      dockerfile: deploy/Dockerfile
+      args:
+        - CMD_PATH=cmd/api
+        - CMD_NAME=main.go
 
     container_name: wireguard_manager
     
@@ -18,7 +22,7 @@ services:
       - wireguard_manager_log:/app/log/
       
     env_file:
-      - ../cmd/api/config.example.env
+      - config.example.env
 
     cap_add:
       - NET_ADMIN

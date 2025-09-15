@@ -5,7 +5,7 @@ After=network.target
 [Service]
 Type=simple
 RemainAfterExit=yes
-ExecStart=/usr/bin/sudo /coredns --conf /app/deploy/corefile
+ExecStart=/usr/bin/sudo /coredns --conf /routing/corefile.conf
 TimeoutStartSec=0
 Restart=on-failure
 
