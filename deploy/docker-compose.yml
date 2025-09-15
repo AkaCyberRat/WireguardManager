@@ -18,7 +18,7 @@ services:
       - wireguard_manager_log:/app/log/
       
     env_file:
-      - ../configs/config.env.example
+      - ../cmd/api/config.example.env
 
     cap_add:
       - NET_ADMIN
