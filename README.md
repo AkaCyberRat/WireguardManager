@@ -58,7 +58,7 @@ Avaliable API interfaces:
           - your/mount/path3:/app/ssl/
 
         env_file:
-          - ../configs/config.env.example
+          - ../configs/config.example.env
 
         cap_add:
           - NET_ADMIN
