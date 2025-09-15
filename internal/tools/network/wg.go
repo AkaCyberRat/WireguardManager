@@ -23,13 +23,13 @@ func (t *Tool) wgServerUp(privateKey string) error {
 		return errors.New("wg interface already exists")
 	}
 
-	linkAtrrs := netlink.NewLinkAttrs()
-	linkAtrrs.Name = t.interfaceName
-	linkAtrrs.MTU = 1420
-	linkAtrrs.TxQLen = 1000
+	linkAttrs := netlink.NewLinkAttrs()
+	linkAttrs.Name = t.interfaceName
+	linkAttrs.MTU = 1420
+	linkAttrs.TxQLen = 1000
 
 	wg_link := wgLink{}
-	wg_link.LinkAttrs = &linkAtrrs
+	wg_link.LinkAttrs = &linkAttrs
 	wg_link.LinkType = "wireguard"
 
 	handle, err := netlink.NewHandle()

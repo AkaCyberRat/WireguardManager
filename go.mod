@@ -13,7 +13,7 @@ require (
 	github.com/knadh/koanf v1.5.0
 	github.com/sirupsen/logrus v1.9.0
 	github.com/swaggo/swag v1.8.9
-	github.com/vishvananda/netlink v1.1.0
+	github.com/vishvananda/netlink v1.3.1
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20221104135756-97bc4ad4a1cb
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/sqlite v1.4.4
@@ -58,7 +58,7 @@ require (
 	github.com/pelletier/go-toml/v2 v2.0.6 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.2.9 // indirect
-	github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df // indirect
+	github.com/vishvananda/netns v0.0.5 // indirect
 	golang.org/x/arch v0.0.0-20210923205945-b76863e36670 // indirect
 	golang.org/x/crypto v0.36.0 // indirect
 	golang.org/x/net v0.38.0 // indirect
