@@ -6,7 +6,7 @@ example/
 
 
 .env
-*.dev
+*.dev*
 
 !.dockerignore
 
