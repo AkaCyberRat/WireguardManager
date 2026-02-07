@@ -1,0 +1,5 @@
+{
+  "PeerPublicKey": "PEER_PUBLIC_KEY",
+  "ServerPrivateKey": "SERVER_PRIVATE_KEY",
+  "ServerPort": 51830
+}

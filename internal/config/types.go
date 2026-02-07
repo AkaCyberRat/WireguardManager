@@ -1,6 +1,6 @@
 package config
 
-type Configuration struct {
+type Configuration_ struct {
 	Host struct {
 		Ip string `koanf:"ip" validate:"required,ipv4"`
 	} `koanf:"host" validate:"required"`

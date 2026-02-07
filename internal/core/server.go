@@ -7,9 +7,10 @@ import (
 )
 
 //
-// Main model
+// Основная модель
 //
 
+// Server представляет сервер, хранящий открытый и закрытый ключи, а также статус включения.
 type Server struct {
 	PublicKey  string
 	PrivateKey string
@@ -17,14 +18,16 @@ type Server struct {
 }
 
 //
-// Operation models
+// Модели операций
 //
 
+// UpdateServer — модель запроса на обновление сервера.
 type UpdateServer struct {
 	PrivateKey *string `validate:"omitempty,base64"`
 	Enabled    *bool   `validate:"omitempty"`
 }
 
+// Validate проверяет, что хотя бы одно поле задано, и что структура валидна.
 func (p *UpdateServer) Validate() bool {
 	if p.PrivateKey == nil && p.Enabled == nil {
 		return false
@@ -34,6 +37,7 @@ func (p *UpdateServer) Validate() bool {
 	return err == nil
 }
 
+// ResponseServer — DTO, возвращаемый после операций с сервером.
 type ResponseServer struct {
 	HostIp    string
 	DnsIp     string
@@ -43,7 +47,10 @@ type ResponseServer struct {
 }
 
 var (
-	ErrServerNotFound      = errors.New("server not found")
+	// ErrServerNotFound возвращается, когда сервер не найден.
+	ErrServerNotFound = errors.New("server not found")
+	// ErrServerAlreadyExists возвращается, когда сервер с таким ключом уже существует.
 	ErrServerAlreadyExists = errors.New("server alredy exists")
+	// ErrIncorrectPrivateKey возвращается, если передан неверный закрытый ключ.
 	ErrIncorrectPrivateKey = errors.New("incorrect private key")
 )

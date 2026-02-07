@@ -10,7 +10,7 @@ type Deps struct {
 	NetTool          network.NetworkTool
 	PeerRepository   repositories.PeerRepository
 	ServerRepository repositories.ServerRepository
-	Config           config.Configuration
+	Config           config.Configuration_
 }
 
 type Services struct {

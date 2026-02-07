@@ -93,6 +93,14 @@ func (t *Tool) DisablePeer(peer *core.Peer) error {
 }
 
 func (t *Tool) GeneratePublicKey(privateKey string) (string, error) {
+	return GeneratePublicKey(privateKey)
+}
+
+func (t *Tool) GeneratePrivateKey() (string, error) {
+	return GeneratePrivateKey()
+}
+
+func GeneratePublicKey(privateKey string) (string, error) {
 	prKey, err := wgtypes.ParseKey(privateKey)
 	if err != nil {
 		return "", err
@@ -101,7 +109,7 @@ func (t *Tool) GeneratePublicKey(privateKey string) (string, error) {
 	return prKey.PublicKey().String(), nil
 }
 
-func (t *Tool) GeneratePrivateKey() (string, error) {
-	pubKey, err := wgtypes.GeneratePrivateKey()
-	return pubKey.String(), err
+func GeneratePrivateKey() (string, error) {
+	prKey, err := wgtypes.GeneratePrivateKey()
+	return prKey.String(), err
 }
