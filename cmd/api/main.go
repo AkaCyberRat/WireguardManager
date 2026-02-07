@@ -36,7 +36,7 @@ func main() {
 
 	logging.SetTempConfiguration()
 
-	conf, err := config.LoadConfiguration()
+	conf, err := config.LoadConfiguration_()
 	if err != nil {
 		logrus.Fatal("Config error: ", err.Error())
 	}

@@ -21,7 +21,7 @@ type Server struct {
 	recoverService RecoverService
 	serverRepos    repositories.ServerRepository
 	netTool        network.NetworkTool
-	config         config.Configuration
+	config         config.Configuration_
 }
 
 type ServerDeps struct {
@@ -29,7 +29,7 @@ type ServerDeps struct {
 	SyncService      SyncService
 	RecoverService   RecoverService
 	NetTool          network.NetworkTool
-	Config           config.Configuration
+	Config           config.Configuration_
 }
 
 func NewServerService(deps ServerDeps) *Server {
@@ -81,7 +81,7 @@ func (s *Server) Update(ctx context.Context, model *core.UpdateServer) (*core.Re
 		}
 
 		if model.PrivateKey != nil {
-			publicKey, err := s.netTool.GeneratePublicKey(*model.PrivateKey)
+			publicKey, err := network.GeneratePublicKey(*model.PrivateKey)
 			if err != nil {
 				return err
 			}

@@ -1,0 +1,72 @@
+name: Deploy to Dev Stage
+
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout code
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      # 2. Setup Go
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.23'
+
+      # 3. Build binary
+      - name: Build binary
+        run: |
+          cd cmd/app
+          go build -o wg-base ./...
+          cd ../..
+
+      # 4. Build Docker image
+      - name: Build Docker image
+        run: |
+          docker build -t myapp:dev .
+
+      # 5. Setup SSH key (подрезанный deploy пользователь)
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.8.1
+        with:
+          ssh-private-key: ${{ secrets.DEV_SSH_KEY }}
+
+
+
+      - name: Prepare config.json
+        run: |
+          cp config/config.json config.json
+
+          sed -i \
+            -e 's|PEER_PUBLIC_KEY|${{ secrets.TEST_PEER_PUBLIC_KEY }}|g' \
+            -e 's|SERVER_PUBLIC_KEY|${{ secrets.TEST_SERVER_PUBLIC_KEY }}|g' \
+            config.json
+
+          ssh ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }} "mkdir -p /var/www/single-peer-setup"
+          scp config.json ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }}:/var/www/single-peer-setup/config.json
+
+
+      # 7. Deploy container на dev сервере
+      - name: Deploy container
+        run: |
+          ssh ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }} "
+          mkdir -p /var/www/single-peer-setup
+          exit
+          "
+          scp cmd/app/single-peer-setup ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }}:/var/www/single-peer-setup/single-peer-setup
+          ssh ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }} "
+          docker stop single-peer-setup || true
+          docker rm single-peer-setup || true
+          docker run -d \
+            --name single-peer-setup \
+            -v /var/www/single-peer-setup:/app/ \
+            -p 51830:51830 \
+            wg-base:dev
+          "

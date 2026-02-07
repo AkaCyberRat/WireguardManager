@@ -1,3 +1,4 @@
+// internal/logging/logging.go
 package logging
 
 import (
@@ -10,12 +11,14 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// Deps хранит параметры конфигурации логгирования, которые будут переданы в Configure.
 type Deps struct {
-	ConsoleLogLevel string
-	FileLogLevel    string
-	FilePath        string
+	ConsoleLogLevel string // Уровень логов для консоли
+	FileLogLevel    string // Уровень логов для файла
+	FilePath        string // Путь к файлу логов
 }
 
+// SetTempConfiguration задаёт временную конфигурацию логгирования (вывод в консоль, форматирование и уровень Info).
 func SetTempConfiguration() {
 	formatter := &nested.Formatter{
 		HideKeys:        true,
@@ -29,10 +32,12 @@ func SetTempConfiguration() {
 	logrus.SetLevel(logrus.InfoLevel)
 }
 
+// Configure инициализирует логгер согласно переданным зависимостям.
+// Создаёт директорию для файлов, открывает/создаёт файл логов,
+// устанавливает уровни логирования для консоли и файлов, и добавляет собственный writerHook.
 func Configure(deps Deps) error {
-
 	//
-	// Parse log levels from deps.
+	// Разбор уровней логов из зависимостей.
 	//
 	consLogLevel, err := logrus.ParseLevel(deps.ConsoleLogLevel)
 	if err != nil {
@@ -45,7 +50,7 @@ func Configure(deps Deps) error {
 	}
 
 	//
-	// Prepare file writer for file logging.
+	// Подготовка writer‑а для логов в файл.
 	//
 	folderPath, _ := filepath.Split(deps.FilePath)
 	if err = os.MkdirAll(folderPath, 0777); err != nil {
@@ -58,20 +63,20 @@ func Configure(deps Deps) error {
 	}
 
 	//
-	// Set minimum level, then below override
-	// levels for every log output. And remove standart output.
+	// Устанавливаем уровень Trace, чтобы последующие MinLogLevel‑ы
+	// в writerHook могли «открепить» нужный минимум.
+	// Отключаем стандартный вывод.
 	//
 	logrus.SetLevel(logrus.TraceLevel)
 	logrus.SetOutput(io.Discard)
 
 	//
-	// Add self-written console and file outputs
+	// Добавляем консольный и файловый output‑ы с помощью writerHook.
 	//
 	logrus.AddHook(&writerHook{
 		Writer:      os.Stdout,
 		MinLogLevel: consLogLevel,
 	})
-
 	logrus.AddHook(&writerHook{
 		Writer:      fileWriter,
 		MinLogLevel: fileLogLevel,

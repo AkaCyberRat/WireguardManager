@@ -9,6 +9,7 @@ require (
 	github.com/gin-gonic/gin v1.9.1-0.20230221094249-0b5df9fc3992
 	github.com/go-playground/validator/v10 v10.11.2
 	github.com/golang-jwt/jwt/v4 v4.5.2
+	github.com/google/nftables v0.3.0
 	github.com/google/uuid v1.3.0
 	github.com/knadh/koanf v1.5.0
 	github.com/sirupsen/logrus v1.9.0
@@ -39,7 +40,6 @@ require (
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
-	github.com/josharian/native v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
 	github.com/leodido/go-urn v1.2.1 // indirect
@@ -47,8 +47,8 @@ require (
 	github.com/mattn/go-isatty v0.0.17 // indirect
 	github.com/mattn/go-sqlite3 v1.14.15 // indirect
 	github.com/mdlayher/genetlink v1.2.0 // indirect
-	github.com/mdlayher/netlink v1.6.2 // indirect
-	github.com/mdlayher/socket v0.2.3 // indirect
+	github.com/mdlayher/netlink v1.7.3-0.20250113171957-fbb4dce95f42 // indirect
+	github.com/mdlayher/socket v0.5.0 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect

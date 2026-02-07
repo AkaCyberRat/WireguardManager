@@ -16,15 +16,17 @@ import (
 )
 
 const (
-	ConfigFilepath = "./configs/config.json"
-	EnvPrefix      = "APP_"
+	ConfigFilepath    = "./configs/config.json"
+	envPrefix         = "APP_"
+	configuratorDelim = "."
+	unmarshalPath     = ""
 )
 
-func LoadConfiguration() (*Configuration, error) {
+func LoadConfiguration_() (*Configuration_, error) {
 	//
 	// Create configurator instances
 	//
-	configurator := koanf.New(".")
+	configurator := koanf.New(configuratorDelim)
 
 	//
 	// (First layer) Set default values
@@ -62,7 +64,7 @@ func LoadConfiguration() (*Configuration, error) {
 	//
 	// (Third layer) Load environment variables
 	//
-	err = configurator.Load(env.Provider(EnvPrefix, ".", convertEnvVarName), nil)
+	err = configurator.Load(env.Provider(envPrefix, ".", convertEnvVarName), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load environment variables: %v", err.Error())
 	}
@@ -71,7 +73,7 @@ func LoadConfiguration() (*Configuration, error) {
 	//
 	// Unmarshal app config
 	//
-	var config Configuration
+	var config Configuration_
 	err = configurator.Unmarshal("", &config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %v", err.Error())
@@ -93,10 +95,10 @@ func LoadConfiguration() (*Configuration, error) {
 func convertEnvVarName(s string) string {
 
 	return strings.Replace(
-		strings.ToLower(strings.TrimPrefix(s, EnvPrefix)), "_", ".", -1)
+		strings.ToLower(strings.TrimPrefix(s, envPrefix)), "_", ".", -1)
 }
 
-func showConfiguration(conf Configuration) {
+func showConfiguration(conf Configuration_) {
 	bytes, _ := yaml.Marshal(conf)
 	strs := strings.Split(string(bytes), "\n")
 
@@ -105,4 +107,35 @@ func showConfiguration(conf Configuration) {
 		logrus.Infof("%s", v)
 	}
 	logrus.Infof("%s\n", strs[len(strs)-2])
+}
+
+type Configuration interface {
+	ToDefault() Configuration
+	Validate() error
+}
+
+func LoadConfiguration[TConfiguration Configuration](path string) (TConfiguration, error) {
+	var zero TConfiguration
+
+	configurator := koanf.New(configuratorDelim)
+
+	if err := configurator.Load(file.Provider(path), json.Parser()); err != nil {
+		return zero, fmt.Errorf("failed to read user configuration file: %v", err)
+	}
+
+	if err := configurator.Load(env.Provider(envPrefix, configuratorDelim, convertEnvVarName), nil); err != nil {
+		return zero, fmt.Errorf("failed to load environment variables: %v", err)
+	}
+
+	temp := (*new(TConfiguration)).ToDefault().(TConfiguration)
+
+	if err := configurator.Unmarshal(unmarshalPath, &temp); err != nil {
+		return zero, fmt.Errorf("failed to unmarshal config: %v", err)
+	}
+
+	if err := temp.Validate(); err != nil {
+		return zero, fmt.Errorf("config validation failed: %v", err)
+	}
+
+	return temp, nil
 }

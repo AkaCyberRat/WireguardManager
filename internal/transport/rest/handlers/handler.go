@@ -19,7 +19,7 @@ type Deps struct {
 	PeerService   services.PeerService
 	ServerService services.ServerService
 	AuthTool      auth.AuthTool
-	Config        config.Configuration
+	Config        config.Configuration_
 }
 
 type Handler struct {

@@ -74,12 +74,12 @@ func (r *Repositories) initServer(netTool network.NetworkTool, privateKey string
 	var err error
 
 	if privateKey == "" {
-		if privateKey, err = netTool.GeneratePrivateKey(); err != nil {
+		if privateKey, err = network.GeneratePrivateKey(); err != nil {
 			return err
 		}
 	}
 
-	publicKey, err := netTool.GeneratePublicKey(privateKey)
+	publicKey, err := network.GeneratePublicKey(privateKey)
 	if err != nil {
 		return err
 	}
