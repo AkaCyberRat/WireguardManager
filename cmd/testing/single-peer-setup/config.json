@@ -1,5 +1,5 @@
 {
-  "PeerPublicKey": "${{ secrets.PEER_PUBLIC_KEY }}",
-  "ServerPrivateKey": "${{ secrets.SERVER_PUBLIC_KEY }}",
+  "PeerPublicKey": "PEER_PUBLIC_KEY",
+  "ServerPrivateKey": "SERVER_PRIVATE_KEY",
   "ServerPort": 51830
 }
