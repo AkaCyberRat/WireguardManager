@@ -26,7 +26,13 @@ example_run: example_build
 
 lint-check:
 	@start=$$(date +%s); \
-	golangci-lint run ./... --config .golangci.yml; \
+	docker run --rm \
+		-v "$(CURDIR):/app" \
+		-v "$(HOME)/go/pkg/mod:/go/pkg/mod" \
+		-v "$(HOME)/.cache/golangci-lint:/root/.cache" \
+		-w /app \
+		golangci/golangci-lint:v1.63.4 \
+		golangci-lint run ./... --config .golangci.yml; \
 	echo '"make lint-check" completed!'; \
 	end=$$(date +%s); \
 	elapsed=$$((end - start)); \
@@ -35,7 +41,13 @@ lint-check:
 
 lint-fix:
 	@start=$$(date +%s); \
-	golangci-lint run ./... --config .golangci.yml --fix; \
+	docker run --rm \
+		-v "$(CURDIR):/app" \
+		-v "$(HOME)/go/pkg/mod:/go/pkg/mod" \
+		-v "$(HOME)/.cache/golangci-lint:/root/.cache" \
+		-w /app \
+		golangci/golangci-lint:v1.63.4 \
+		golangci-lint run ./... --config .golangci.yml --fix; \
 	echo '"make lint-fix" completed!'; \
 	end=$$(date +%s); \
 	elapsed=$$((end - start)); \

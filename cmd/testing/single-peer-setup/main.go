@@ -195,7 +195,7 @@ func main() {
 
 	conf, err := config.LoadConfiguration[Configuration](configPath)
 	if err != nil {
-		logrus.Fatal("Config error: ", err.Error())
+		logrus.Fatal("Failed to load config: ", err.Error())
 	}
 	logrus.Infof("Configuration: %+v", conf)
 
@@ -203,7 +203,7 @@ func main() {
 
 	err = netTool.EnableServer(&core.Server{PublicKey: "", PrivateKey: conf.ServerPrivateKey, Enabled: true})
 	if err != nil {
-		logrus.Fatal("Failed to enable server:", err.Error())
+		logrus.Fatal("Failed to enable server: ", err.Error())
 	}
 	logrus.Infof("Server enabled")
 
@@ -211,7 +211,7 @@ func main() {
 	extIface := "eth0" // Внешний интерфейс
 
 	if err := setupNATRouteAndMSS(wgIface, extIface); err != nil {
-		log.Fatal(err)
+		log.Fatal("Failed to setup NAT and route: ", err)
 	}
 
 	log.Println("NAT и маршруты успешно настроены")
@@ -225,6 +225,10 @@ func main() {
 		UploadSpeed:   10,
 		Status:        core.Enabled,
 	})
+	if err != nil {
+		logrus.Fatal("Failed to enable peer:", err.Error())
+	}
+
 	logrus.Infof("Peer enabled")
 
 	// Wait for exit signal
