@@ -1,0 +1,29 @@
+name: Build app binary
+
+
+inputs:
+    build_target:
+        description: 'Path to the Go package to build (relative to the repository root)'
+        required: true
+
+    output_path:
+        description: 'Path where the built binary should be saved (relative to the repository root)'
+        required: false
+        default: './build/app'
+
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
+
+    - name: Setup Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.23'
+
+    - name: Build binary
+      shell: bash
+      run: |
+        go build -o ${{ inputs.output_path }} ./${{ inputs.build_target }}

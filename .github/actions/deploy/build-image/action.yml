@@ -1,0 +1,29 @@
+name: Build image for deployment
+
+inputs:
+  dockerfile_source:
+    description: 'Path to the Dockerfile to build (relative to the repository root)'
+    required: true
+
+  dockerfile_destination:
+    description: 'Path on the remote server where the Dockerfile should be placed'
+    required: true
+
+  image_tag:
+    description: 'Tag for the built Docker image'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Move Dockerfile
+      shell: bash
+      run: |
+        ssh ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }} "mkdir -p ${{ inputs.dockerfile_destination }}"
+        scp ${{ inputs.dockerfile_source }} ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }}:${{ inputs.dockerfile_destination }}
+
+    - name: Build deploy image
+      shell: bash
+      run: |
+        ssh ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }} "
+          docker build -t ${{ inputs.image_tag }} -f ${{ inputs.dockerfile_destination }} .
