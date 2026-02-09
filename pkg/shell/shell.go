@@ -3,6 +3,7 @@ package shell
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os/exec"
 	"strings"
 	"time"
@@ -10,7 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func Run(command string) (string, error) {
+func RunExecWithTimeout(command string) (string, error) {
 	stdOut := &bytes.Buffer{}
 	stdErr := &bytes.Buffer{}
 
@@ -34,4 +35,25 @@ func Run(command string) (string, error) {
 
 	logrus.Tracef("Command: '%v' Out: '%v'", cmd.String(), strOut)
 	return strOut, nil
+}
+
+func RunBlockingExec(cmd string, args ...any) error {
+	strArgs := make([]string, len(args))
+	for i, a := range args {
+		switch v := a.(type) {
+		case string:
+			strArgs[i] = v
+		case fmt.Stringer:
+			strArgs[i] = v.String()
+		default:
+			return fmt.Errorf("unsupported arg type %T", a)
+		}
+	}
+
+	c := exec.Command(cmd, strArgs...)
+	out, err := c.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%s %v failed: %v\n%s", cmd, strArgs, err, out)
+	}
+	return nil
 }

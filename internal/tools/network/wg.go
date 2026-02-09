@@ -3,11 +3,14 @@ package network
 import (
 	"errors"
 	"net"
+	"net/netip"
 	"strings"
 
 	"github.com/sirupsen/logrus"
 	"github.com/vishvananda/netlink"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+
+	"WireguardManager/pkg/shell"
 )
 
 const (
@@ -164,6 +167,55 @@ func (t *Tool) wgPeerDown(ip string, publicKey string) error {
 
 	logrus.Tracef("Wireguard peer disabled. [Ip=%v, PubKey=%v]", ip, publicKey)
 	return nil
+}
+
+// SetupWgNAT turns on iptables (legacy) NAT for packets forwarding between interfaces.
+//
+// - wgInf is the name of wg interface (e.g. wg0)
+//
+// - gwInf is the name of gateway interface (e.g. eth0)
+//
+// - wgPort is the port number on which wg server listens (e.g. 51820)
+//
+// - wgNet is the CIDR prefix of wg network (e.g. '11.0.0.0/24')
+func SetupWgNAT(wgInf string, gwInf string, wgPort uint16, wgNet netip.Prefix) error {
+	if err := shell.RunBlockingExec(
+		"iptables",
+		"-t", "nat",
+		"-A", "POSTROUTING",
+		"-s", wgNet,
+		"-o", gwInf,
+		"-j", "MASQUERADE",
+	); err != nil {
+		return err
+	}
+
+	if err := shell.RunBlockingExec(
+		"iptables",
+		"-A", "INPUT",
+		"-p", "udp",
+		"-m", "udp",
+		"--dport", wgPort,
+		"-j", "ACCEPT",
+	); err != nil {
+		return err
+	}
+
+	if err := shell.RunBlockingExec(
+		"iptables",
+		"-A", "FORWARD",
+		"-i", wgInf,
+		"-j", "ACCEPT",
+	); err != nil {
+		return err
+	}
+
+	return shell.RunBlockingExec(
+		"iptables",
+		"-A", "FORWARD",
+		"-o", wgInf,
+		"-j", "ACCEPT",
+	)
 }
 
 //
