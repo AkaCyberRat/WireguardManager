@@ -2,6 +2,7 @@ package network
 
 import (
 	"errors"
+	"golang.zx2c4.com/wireguard/wgctrl"
 	"net"
 	"net/netip"
 	"strings"
@@ -169,6 +170,166 @@ func (t *Tool) wgPeerDown(ip string, publicKey string) error {
 	return nil
 }
 
+// SetupWgInterface creates and configures a wireguard interface with the given parameters.
+// - 'infName' is the name of wg interface (e.g. 'wg0')
+//
+// - 'ip' is the IP address of wg interface (e.g. '11.0.0.1')
+//
+// - 'mask' is the subnet mask of wg interface (e.g. '24')
+//
+// - 'privateKey' is the private key of wg server
+//
+// - 'port' is the port number on which wg server listens (e.g. 51820)
+func SetupWgInterface(infName string, ip net.IP, mask net.IPMask, privateKey string, port int) error {
+	const WgLinkType = "wireguard"
+	const WgLinkMTU = 1420
+	const WgLinkTxQLen = 1000
+
+	linkAttrs := netlink.NewLinkAttrs()
+	linkAttrs.Name = infName
+	linkAttrs.MTU = WgLinkMTU
+	linkAttrs.TxQLen = WgLinkTxQLen
+
+	wireguardLink := wgLink{}
+	wireguardLink.LinkType = WgLinkType
+	wireguardLink.LinkAttrs = &linkAttrs
+
+	handle, err := netlink.NewHandle()
+	if err != nil {
+		return err
+	}
+
+	if err = handle.LinkAdd(netlink.Link(wireguardLink)); err != nil {
+		return err
+	}
+
+	// Configure wg interface
+	pk, err := wgtypes.ParseKey(privateKey)
+	if err != nil {
+		return err
+	}
+
+	config := wgtypes.Config{
+		PrivateKey:   &pk,
+		ListenPort:   &port,
+		ReplacePeers: true,
+		Peers:        make([]wgtypes.PeerConfig, 0),
+	}
+
+	link, err := handle.LinkByName(infName)
+	if err != nil {
+		return err
+	}
+
+	if err = handle.AddrAdd(link, &netlink.Addr{
+		IPNet: &net.IPNet{
+			IP:   ip,
+			Mask: mask,
+		},
+	}); err != nil {
+		return err
+	}
+
+	client, err := wgctrl.New()
+	if err != nil {
+		return err
+	}
+
+	if err = client.ConfigureDevice(infName, config); err != nil {
+		return err
+	}
+
+	link, err = handle.LinkByName(infName)
+	if err != nil {
+		return err
+	}
+
+	if err = netlink.LinkSetUp(link); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// IsWgInterfaceExists checks if a wireguard interface with the given name exists.
+func IsWgInterfaceExists(interfaceName string) bool {
+
+	_, err := netlink.LinkByName(interfaceName)
+
+	return err == nil
+}
+
+// AddWgPeer adds a peer to the wireguard interface with the given parameters.
+//
+// - 'wgInf' is the name of wg interface (e.g. 'wg0')
+//
+// - 'ip' is the IP address of peer (e.g. '11.0.0.2')
+//
+// - 'mask' is the subnet mask of peer (e.g. '32')
+//
+// - 'publicKey' is the public key of peer
+//
+// - 'preSharedKey' is the pre-shared key of peer (optional)
+func AddWgPeer(wgInf string, ip net.IP, mask net.IPMask, publicKey string, preSharedKey *string) error {
+	pubKey, err := wgtypes.ParseKey(publicKey)
+	if err != nil {
+		return err
+	}
+
+	peerIpNet := []net.IPNet{{IP: ip, Mask: mask}}
+
+	peer := wgtypes.PeerConfig{
+		PublicKey:  pubKey,
+		AllowedIPs: peerIpNet,
+	}
+
+	if preSharedKey != nil {
+		preKey, err := wgtypes.ParseKey(*preSharedKey)
+		if err != nil {
+			return err
+		}
+		peer.PresharedKey = &preKey
+	}
+
+	client, err := wgctrl.New()
+	if err != nil {
+		return err
+	}
+
+	return client.ConfigureDevice(wgInf, wgtypes.Config{Peers: []wgtypes.PeerConfig{peer}})
+}
+
+// RemoveWgPeer removes a peer from the wireguard interface with the given parameters.
+//
+// - 'wgInf' is the name of wg interface (e.g. 'wg0')
+//
+// - 'ip' is the IP address of peer (e.g. '11.0.0.2')
+//
+// - 'mask' is the subnet mask of peer (e.g. '32')
+//
+// - 'publicKey' is the public key of peer
+func RemoveWgPeer(wgInf string, ip net.IP, mask net.IPMask, publicKey string) error {
+	pubKey, err := wgtypes.ParseKey(publicKey)
+	if err != nil {
+		return err
+	}
+
+	peerIpNet := []net.IPNet{{IP: ip, Mask: mask}}
+
+	peer := wgtypes.PeerConfig{
+		PublicKey:  pubKey,
+		AllowedIPs: peerIpNet,
+		Remove:     true,
+	}
+
+	client, err := wgctrl.New()
+	if err != nil {
+		return err
+	}
+
+	return client.ConfigureDevice(wgInf, wgtypes.Config{Peers: []wgtypes.PeerConfig{peer}})
+}
+
 // SetupWgNAT turns on iptables (legacy) NAT for packets forwarding between interfaces.
 //
 // - wgInf is the name of wg interface (e.g. wg0)
@@ -178,7 +339,7 @@ func (t *Tool) wgPeerDown(ip string, publicKey string) error {
 // - wgPort is the port number on which wg server listens (e.g. 51820)
 //
 // - wgNet is the CIDR prefix of wg network (e.g. '11.0.0.0/24')
-func SetupWgNAT(wgInf string, gwInf string, wgPort uint16, wgNet netip.Prefix) error {
+func SetupWgNAT(wgInf string, gwInf string, wgPort int, wgNet netip.Prefix) error {
 	if err := shell.RunBlockingExec(
 		"iptables",
 		"-t", "nat",
