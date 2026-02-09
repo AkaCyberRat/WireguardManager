@@ -3,9 +3,8 @@ package main
 import (
 	"WireguardManager/internal/core"
 	"flag"
-	"fmt"
+	"net/netip"
 	"os"
-	"os/exec"
 	"os/signal"
 	"syscall"
 
@@ -27,43 +26,6 @@ func (c Configuration) ToDefault() config.Configuration {
 }
 
 func (c Configuration) Validate() error {
-	return nil
-}
-
-// runExec выполняет команду и возвращает ошибку с выводом
-func runExec(cmd string, args ...string) error {
-	c := exec.Command(cmd, args...)
-	out, err := c.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("%s %v failed: %v\n%s", cmd, args, err, out)
-	}
-	return nil
-}
-
-// SetupWgNAT настраивает MASQUERADE и форвардинг для WireGuard контейнера
-func SetupWgNAT() error {
-
-	//iptables -t nat -A POSTROUTING -s 11.0.0.0/24 -o eth0 -j MASQUERADE;
-	//iptables -A INPUT -p udp -m udp --dport 51820 -j ACCEPT;
-	//iptables -A FORWARD -i wg0 -j ACCEPT;
-	//iptables -A FORWARD -o wg0 -j ACCEPT
-
-	if err := runExec("iptables", "-t", "nat", "-A", "POSTROUTING", "-s", "11.0.0.0/24", "-o", "eth0", "-j", "MASQUERADE"); err != nil {
-		return err
-	}
-
-	if err := runExec("iptables", "-A", "INPUT", "-p", "udp", "-m", "udp", "--dport", "51820", "-j", "ACCEPT"); err != nil {
-		return err
-	}
-
-	if err := runExec("iptables", "-A", "FORWARD", "-i", "wg0", "-j", "ACCEPT"); err != nil {
-		return err
-	}
-
-	if err := runExec("iptables", "-A", "FORWARD", "-o", "wg0", "-j", "ACCEPT"); err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -101,15 +63,14 @@ func main() {
 
 	logrus.Infof("Peer enabled")
 
-	err = SetupWgNAT()
-	if err != nil {
-		logrus.Fatal("Failed to setup NAT: ", err.Error())
+	wgNet := netip.MustParsePrefix("11.0.0.0/24")
+	wgPort := uint16(conf.ServerPort)
+
+	if err := network.SetupWgNAT("wg0", "eth0", wgPort, wgNet); err != nil {
+		logrus.Fatal("Failed to setup WgNAT: ", err.Error())
 	}
 
-	if err != nil {
-		logrus.Fatal("Failed to setup nftables: ", err.Error())
-	}
-	logrus.Infof("nftables rules set up")
+	logrus.Infof("WgNaT setup completed")
 
 	// Wait for exit signal
 	waitForExitSignal()
