@@ -1,8 +1,9 @@
 package main
 
 import (
-	"WireguardManager/internal/core"
 	"flag"
+	"fmt"
+	"net"
 	"net/netip"
 	"os"
 	"os/signal"
@@ -30,47 +31,51 @@ func (c Configuration) Validate() error {
 }
 
 func main() {
+	const GwInfName, WgInfName = "eth0", "wg0"
+	const WgServerIp, WgServerMask = "11.0.0.1", 24
+	const WgPeerIp, WgPeerMask = "11.0.0.2", 32
+
 	logging.SetTempConfiguration()
 
-	configPath := getConfigPathFromArgs()
+	// Load configuration
 
+	configPath := getConfigPathFromArgs()
 	conf, err := config.LoadConfiguration[Configuration](configPath)
 	if err != nil {
 		logrus.Fatal("Failed to load config: ", err.Error())
 	}
-	logrus.Infof("Configuration: %+v", conf)
 
-	netTool := network.NewNetworkTool(conf.ServerPort)
+	// Setup Wg interface
 
-	err = netTool.EnableServer(&core.Server{PublicKey: "", PrivateKey: conf.ServerPrivateKey, Enabled: true})
-	if err != nil {
-		logrus.Fatal("Failed to enable server: ", err.Error())
+	wgServerIp := net.ParseIP(WgServerIp)
+	wgServerMask := net.CIDRMask(WgServerMask, 32)
+	serverPrivateKey := conf.ServerPrivateKey
+	port := conf.ServerPort
+
+	if err := network.SetupWgInterface(WgInfName, wgServerIp, wgServerMask, serverPrivateKey, port); err != nil {
+		logrus.Fatal("Failed to setup Wg interface: ", err.Error())
 	}
 	logrus.Infof("Server enabled")
 
-	err = netTool.EnablePeer(&core.Peer{
-		Id:            "2",
-		Ip:            "11.0.0.2",
-		PublicKey:     conf.PeerPublicKey,
-		PresharedKey:  "",
-		DownloadSpeed: 100,
-		UploadSpeed:   100,
-		Status:        core.Enabled,
-	})
-	if err != nil {
-		logrus.Fatal("Failed to enable peer:", err.Error())
-	}
+	// Setup Wg peer
 
+	wgPeerIp := net.ParseIP(WgPeerIp)
+	wgPeerMask := net.CIDRMask(WgPeerMask, 32)
+	peerPublicKey := conf.PeerPublicKey
+
+	if err := network.AddWgPeer(WgInfName, wgPeerIp, wgPeerMask, peerPublicKey, nil); err != nil {
+		logrus.Fatal("Failed to add Wg peer: ", err.Error())
+	}
 	logrus.Infof("Peer enabled")
 
-	wgNet := netip.MustParsePrefix("11.0.0.0/24")
-	wgPort := uint16(conf.ServerPort)
+	// Setup NAT for wg interface
 
-	if err := network.SetupWgNAT("wg0", "eth0", wgPort, wgNet); err != nil {
+	wgNetPrefix := netip.MustParsePrefix(fmt.Sprintf("%s/%d", WgServerIp, WgServerMask))
+
+	if err := network.SetupWgNAT(WgInfName, GwInfName, port, wgNetPrefix); err != nil {
 		logrus.Fatal("Failed to setup WgNAT: ", err.Error())
 	}
-
-	logrus.Infof("WgNaT setup completed")
+	logrus.Infof("NAT enabled")
 
 	// Wait for exit signal
 	waitForExitSignal()
