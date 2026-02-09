@@ -24,7 +24,7 @@ jobs:
       - name: Build binary
         run: |
           cd cmd/testing/wg-setup/
-          go build -o wg-setup ./...
+          go build -o app ./...
   
 
       # 5. Setup SSH key (подрезанный deploy пользователь)
@@ -78,7 +78,7 @@ jobs:
             --cap-add=SYS_MODULE \
             --sysctl net.ipv4.ip_forward=1 \
             --sysctl net.ipv4.conf.all.src_valid_mark=1 \
-            -v /var/www/wg-setup/wg-setup:/app/wg-setup \
+            -v /var/www/wg-setup/app:/app/app \
             -v /var/www/wg-setup/config.json:/app/config.json \
             -p 51830:51820/udp \
             wg-base:dev

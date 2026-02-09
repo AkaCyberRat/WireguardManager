@@ -14,4 +14,4 @@ RUN update-alternatives --set iptables /usr/sbin/iptables-legacy && \
 WORKDIR /app
 
 # бинарник будет подмонтирован volume-ом
-ENTRYPOINT ["./single-peer-setup", " --config config.json"]
+ENTRYPOINT ["./app", " --config config.json"]
