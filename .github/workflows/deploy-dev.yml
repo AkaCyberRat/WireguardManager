@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-and-deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
       # 1. Checkout code
@@ -34,6 +34,12 @@ jobs:
           ssh-private-key: ${{ secrets.DEV_SSH_KEY }}
 
 
+      - name: Setup known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.DEV_HOST }} >> ~/.ssh/known_hosts
+
+
       - name: Move Dockerfile
         run: |
           ssh ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }} "mkdir -p /var/www/single-peer-setup"
@@ -47,7 +53,7 @@ jobs:
 
           sed -i \
             -e 's|PEER_PUBLIC_KEY|${{ secrets.TEST_PEER_PUBLIC_KEY }}|g' \
-            -e 's|SERVER_PUBLIC_KEY|${{ secrets.TEST_SERVER_PRIVATE_KEY }}|g' \
+            -e 's|SERVER_PRIVATE_KEY|${{ secrets.TEST_SERVER_PRIVATE_KEY }}|g' \
             config.json
 
           scp config.json ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }}:/var/www/single-peer-setup/config.json
@@ -56,15 +62,24 @@ jobs:
       # 7. Deploy container на dev сервере
       - name: Deploy container
         run: |
-          scp cmd/testing/single-peer-setup ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }}:/var/www/single-peer-setup/single-peer-setup
+          ssh ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }} "
+          docker stop single-peer-setup || true
+          docker rm -f single-peer-setup || true
+          "
+            
+          scp cmd/testing/single-peer-setup/single-peer-setup ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }}:/var/www/single-peer-setup/single-peer-setup
           ssh ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }} "
           cd /var/www/single-peer-setup
-          docker build -t myapp:dev .
-          docker stop single-peer-setup || true
-          docker rm single-peer-setup || true
+          docker build -t wg-base:dev .
           docker run -d \
             --name single-peer-setup \
-            -v /var/www/single-peer-setup:/app/ \
-            -p 51830:51830 \
+            --cap-add=NET_ADMIN \
+            --privileged \
+            --cap-add=SYS_MODULE \
+            --sysctl net.ipv4.ip_forward=1 \
+            --sysctl net.ipv4.conf.all.src_valid_mark=1 \
+            -v /var/www/single-peer-setup/single-peer-setup:/app/single-peer-setup \
+            -v /var/www/single-peer-setup/config.json:/app/config.json \
+            -p 51826:51820/udp \
             wg-base:dev
           "
