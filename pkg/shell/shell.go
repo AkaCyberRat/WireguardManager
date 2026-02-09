@@ -46,7 +46,7 @@ func RunBlockingExec(cmd string, args ...any) error {
 		case fmt.Stringer:
 			strArgs[i] = v.String()
 		default:
-			return fmt.Errorf("unsupported arg type %T", a)
+			strArgs[i] = fmt.Sprint(v)
 		}
 	}
 
