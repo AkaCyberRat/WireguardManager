@@ -1,0 +1,21 @@
+name: Transfer deploy resources
+
+
+inputs:
+  resources_source:
+    description: "Source path to folder with resources"
+    required: true
+
+  resources_destination:
+    description: "Destination path to folder with resources"
+    required: true
+
+
+runs:
+  using: "composite"
+  steps:
+    - name: Transfer deploy resources
+      shell: bash
+      run: |
+        ssh ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }} "mkdir -p ${{ inputs.resources_destination }}"
+        scp ${{ inputs.resources_source }} ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }}:${{ inputs.resources_destination }}

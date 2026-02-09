@@ -1,0 +1,48 @@
+name: Launch new instance
+
+inputs:
+  image_tag:
+    description: 'Tag of the Docker image to run'
+    required: true
+
+  container_name:
+    description: 'Name for the new Docker container instance'
+    required: true
+
+  entrypoint:
+    description: 'Entrypoint command for the Docker container'
+    required: false
+    default: "/app/app"
+
+  entrypoint_flags:
+    description: 'Additional flags for the entrypoint command'
+    required: false
+    default: "--config ./config.json"
+
+  resources_path:
+    description: 'Path to the directory containing resources to mount into the container (relative to the repository root)'
+    required: true
+
+  container_port:
+    description: 'Map host port to the container WireGuard port ( e.g., "51820:51820/udp" )'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Turn on new instance
+      shell: bash
+      run: |
+        ssh ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }} "
+        docker run -d \
+          --name ${{ inputs.container_name }} \
+          --privileged \
+          --cap-add=NET_ADMIN \
+          --cap-add=SYS_MODULE \
+          --sysctl net.ipv4.ip_forward=1 \
+          --sysctl net.ipv4.conf.all.src_valid_mark=1 \
+          -e ${{ inputs.entrypoint }} \
+          -v ${{ inputs.resources_path }}:/app/ \
+          -p ${{ inputs.container_port }} \
+          ${{ inputs.image_tag }} ${{ inputs.entrypoint_flags }}--config ./config.json
+        "

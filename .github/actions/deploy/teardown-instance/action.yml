@@ -1,0 +1,18 @@
+name: Teardown current instance
+
+inputs:
+  container_name:
+    description: 'Name of the Docker container instance to stop and remove'
+    required: true
+
+
+runs:
+  using: "composite"
+  steps:
+    - name: Teardown current instance (if exists)
+      shell: bash
+      run: |
+        ssh ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }} "
+        docker stop ${{ inputs.container_name }} || true
+        docker rm -f ${{ inputs.container_name }} || true
+        "
