@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	WgIpNet = "10.0.0.1/8"
-	WgIp    = "10.0.0.1"
+	WgIpNet = "11.0.0.1/24"
+	WgIp    = "11.0.0.1"
 )
 
 func (t *Tool) wgServerUp(privateKey string) error {
@@ -109,7 +109,7 @@ func (t *Tool) wgPeerUp(ip string, publicKey string, presharedKey string) error 
 	if err != nil {
 		return err
 	}
-	_, ipnet, err := net.ParseCIDR(ip + "/8")
+	_, ipnet, err := net.ParseCIDR(ip + "/32")
 	if err != nil {
 		return err
 	}
