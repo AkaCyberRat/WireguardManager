@@ -67,7 +67,7 @@ jobs:
           docker rm -f wg-setup || true
           "
             
-          scp cmd/testing/wg-setup/wg-setup ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }}:/var/www/wg-setup/wg-setup
+          scp cmd/testing/wg-setup/app ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }}:/var/www/wg-setup/app
           ssh ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }} "
           cd /var/www/wg-setup
           docker build -t wg-base:dev .
