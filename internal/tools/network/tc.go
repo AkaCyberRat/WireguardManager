@@ -134,24 +134,24 @@ func ApplyTcForPeer(wgInf string, peerIp net.IP, serverNetworkMask net.IPMask, d
 		return err
 	}
 
-	_, err = shell.RunExecWithTimeout(fmt.Sprintf("tc filter add dev %[1]s protocol peerIp parent 1: prio %[2]v u32 match peerIp src %[3]v flowid 1:%[2]v", wgInf, hostNum, peerIp))
+	_, err = shell.RunExecWithTimeout(fmt.Sprintf("tc filter add dev %[1]s protocol ip parent 1: prio %[2]v u32 match ip src %[3]v flowid 1:%[2]v", wgInf, hostNum, peerIp))
 	if err != nil {
 		return err
 	}
 
-	_, err = shell.RunExecWithTimeout(fmt.Sprintf("tc filter add dev %[1]s protocol peerIp parent 1: prio %[2]v u32 match peerIp dst %[3]v flowid 1:%[2]v", wgInf, hostNum, peerIp))
+	_, err = shell.RunExecWithTimeout(fmt.Sprintf("tc filter add dev %[1]s protocol ip parent 1: prio %[2]v u32 match ip dst %[3]v flowid 1:%[2]v", wgInf, hostNum, peerIp))
 	if err != nil {
 		return err
 	}
 
 	// Limit upload bandwidth (for server ingress/download)
 
-	_, err = shell.RunExecWithTimeout(fmt.Sprintf("tc filter add dev %s protocol peerIp ingress prio %v u32 match peerIp src %v action police rate %vmbit burst 5mbit", wgInf, hostNum, peerIp, uploadSpeedMb))
+	_, err = shell.RunExecWithTimeout(fmt.Sprintf("tc filter add dev %s protocol ip ingress prio %v u32 match ip src %v action police rate %vmbit burst 5mbit", wgInf, hostNum, peerIp, uploadSpeedMb))
 	if err != nil {
 		return err
 	}
 
-	_, err = shell.RunExecWithTimeout(fmt.Sprintf("tc filter add dev %s protocol peerIp ingress prio %v u32 match peerIp dst %v action police rate %vmbit burst 5mbit", t.interfaceName, hostNum, peerIp, uploadSpeedMb))
+	_, err = shell.RunExecWithTimeout(fmt.Sprintf("tc filter add dev %s protocol ip ingress prio %v u32 match ip dst %v action police rate %vmbit burst 5mbit", wgInf, hostNum, peerIp, uploadSpeedMb))
 	if err != nil {
 		return err
 	}

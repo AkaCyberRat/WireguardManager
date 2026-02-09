@@ -1,0 +1,19 @@
+{
+  "PeerPublicKey": "PEER_PUBLIC_KEY",
+  "ServerPrivateKey": "SERVER_PRIVATE_KEY",
+  "ServerPort": 51820,
+  "Peers": [
+    {
+      "Ip": "11.0.0.2",
+      "Speed": 1
+    },
+    {
+      "Ip": "11.0.0.3",
+      "Speed": 10
+    },
+    {
+      "Ip": "11.0.0.4",
+      "Speed": 100
+    }
+  ]
+}
