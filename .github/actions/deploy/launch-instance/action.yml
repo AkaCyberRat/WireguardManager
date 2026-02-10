@@ -52,5 +52,5 @@ runs:
           -e ${{ inputs.entrypoint }} \
           -v ${{ inputs.resources_path }}:/app/ \
           -p ${{ inputs.container_port }} \
-          ${{ inputs.image_tag }} ${{ inputs.entrypoint_flags }}--config ./config.json
+          ${{ inputs.image_tag }} ${{ inputs.entrypoint_flags }}
         "

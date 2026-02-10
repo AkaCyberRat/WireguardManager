@@ -78,3 +78,75 @@ jobs:
           container_port: "51830:51820/udp"
           dev-user: ${{ secrets.DEV_USER }}
           dev-host: ${{ secrets.DEV_HOST }}
+
+
+  build-and-deploy-wg-tc-setup:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+
+      - name: Setup SSH
+        uses: ./.github/actions/deploy/setup-ssh
+        with:
+          dev-host: ${{ secrets.DEV_HOST }}
+          ssh-private-key: ${{ secrets.DEV_SSH_KEY }}
+
+
+      - name: Build app binary
+        uses: ./.github/actions/deploy/build-binary
+        with:
+          build_target: ./cmd/testing/wg-tc-setup
+          output_path: ./deploy_data/app
+
+
+      - name: Prepare deploy resources
+        shell: bash
+        run: |
+          cp cmd/testing/wg-tc-setup/config.json ./deploy_data/
+
+          sed -i \
+            -e 's|PEER_PUBLIC_KEY|${{ secrets.TEST_PEER_PUBLIC_KEY }}|g' \
+            -e 's|SERVER_PRIVATE_KEY|${{ secrets.TEST_SERVER_PRIVATE_KEY }}|g' \
+            ./deploy_data/config.json
+
+
+      - name: Build deploy image
+        uses: ./.github/actions/deploy/build-image
+        with:
+          dockerfile_source: ./deploy/Dockerfile
+          dockerfile_destination: /tmp/wg-tc-setup/Dockerfile
+          image_tag: wg-base:dev
+          dev-user: ${{ secrets.DEV_USER }}
+          dev-host: ${{ secrets.DEV_HOST }}
+
+
+      - name: Teardown current instance
+        uses: ./.github/actions/deploy/teardown-instance
+        with:
+          container_name: wg-tc-setup
+          dev-user: ${{ secrets.DEV_USER }}
+          dev-host: ${{ secrets.DEV_HOST }}
+
+
+      - name: Transfer deploy resources
+        uses: ./.github/actions/deploy/transfer-resources
+        with:
+          resources_source: ./deploy_data/
+          resources_destination: /var/www/wg-tc-setup/
+          dev-user: ${{ secrets.DEV_USER }}
+          dev-host: ${{ secrets.DEV_HOST }}
+
+
+      - name: Launch new instance
+        uses: ./.github/actions/deploy/launch-instance
+        with:
+          image_tag: wg-base:dev
+          container_name: wg-setup
+          entrypoint: /app/app
+          entrypoint_flags: --config ./config.json
+          resources_path: /var/www/wg-setup/
+          container_port: "51831:51820/udp"
+          dev-user: ${{ secrets.DEV_USER }}
+          dev-host: ${{ secrets.DEV_HOST }}
