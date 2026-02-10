@@ -146,7 +146,7 @@ jobs:
           container_name: wg-tc-setup
           entrypoint: /app/app
           entrypoint_flags: --config ./config.json
-          resources_path: /var/www/wg-setup/
+          resources_path: /var/www/wg-tc-setup/
           container_port: "51831:51820/udp"
           dev-user: ${{ secrets.DEV_USER }}
           dev-host: ${{ secrets.DEV_HOST }}
