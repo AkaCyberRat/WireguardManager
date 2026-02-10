@@ -61,7 +61,7 @@ jobs:
       - name: Transfer deploy resources
         uses: ./.github/actions/deploy/transfer-resources
         with:
-          resources_source: ./deploy_data/
+          resources_source: ./deploy_data/*
           resources_destination: /var/www/wg-setup/
           dev-user: ${{ secrets.DEV_USER }}
           dev-host: ${{ secrets.DEV_HOST }}
@@ -133,7 +133,7 @@ jobs:
       - name: Transfer deploy resources
         uses: ./.github/actions/deploy/transfer-resources
         with:
-          resources_source: ./deploy_data/
+          resources_source: ./deploy_data/*
           resources_destination: /var/www/wg-tc-setup/
           dev-user: ${{ secrets.DEV_USER }}
           dev-host: ${{ secrets.DEV_HOST }}
