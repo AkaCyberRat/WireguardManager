@@ -137,16 +137,29 @@ func SetupTcBase(wgInf string) error {
 		return err
 	}
 
-	// IFB
+	//// IFB
+	//_, _ = shell.RunExecWithTimeout("ip link add ifb0 type ifb")
+	//_, err = shell.RunExecWithTimeout("ip link set ifb0 up")
+	//if err != nil {
+	//	return err
+	//}
+	//
+	//// IFB egress (upload клиента)
+	//_, err = shell.RunExecWithTimeout(
+	//	"tc qdisc add dev ifb0 root handle 2: htb",
+	//)
+	//if err != nil {
+	//	return err
+	//}
+
 	_, _ = shell.RunExecWithTimeout("ip link add ifb0 type ifb")
 	_, err = shell.RunExecWithTimeout("ip link set ifb0 up")
 	if err != nil {
 		return err
 	}
 
-	// IFB egress (upload клиента)
 	_, err = shell.RunExecWithTimeout(
-		"tc qdisc add dev ifb0 root handle 2: htb",
+		"tc qdisc add dev ifb0 root cake bandwidth 100mbit",
 	)
 	if err != nil {
 		return err
@@ -188,8 +201,8 @@ func ApplyTcForPeer(wgInf string, peerIp net.IP, serverNetworkMask net.IPMask, d
 		return err
 	}
 
+	// Works but constantly low speed about 5mb
 	// Limit upload bandwidth (for server ingress/download)
-
 	//_, err = shell.RunExecWithTimeout(fmt.Sprintf("tc filter add dev %s protocol ip ingress prio %v u32 match ip src %v action police rate %vmbit burst 50mbit", wgInf, hostNum, peerIp, uploadSpeedMb))
 	//if err != nil {
 	//	return err
@@ -200,35 +213,36 @@ func ApplyTcForPeer(wgInf string, peerIp net.IP, serverNetworkMask net.IPMask, d
 	//	return err
 	//}
 
-	_, err = shell.RunExecWithTimeout(
-		fmt.Sprintf(
-			"tc filter add dev %s ingress prio %v u32 match ip src %v action mirred egress redirect dev ifb0",
-			wgInf, hostNum, peerIp,
-		),
-	)
-	if err != nil {
-		return err
-	}
-
-	_, err = shell.RunExecWithTimeout(
-		fmt.Sprintf(
-			"tc class add dev ifb0 parent 2: classid 2:%[1]v htb rate %[2]vmbit ceil %[2]vmbit",
-			hostNum, uploadSpeedMb,
-		),
-	)
-	if err != nil {
-		return err
-	}
-
-	_, err = shell.RunExecWithTimeout(
-		fmt.Sprintf(
-			"tc filter add dev ifb0 protocol ip parent 2: prio %[1]v u32 match ip src %[2]v flowid 2:%[1]v",
-			hostNum, peerIp,
-		),
-	)
-	if err != nil {
-		return err
-	}
+	// Works but low precision of speed
+	//_, err = shell.RunExecWithTimeout(
+	//	fmt.Sprintf(
+	//		"tc filter add dev %s ingress prio %v u32 match ip src %v action mirred egress redirect dev ifb0",
+	//		wgInf, hostNum, peerIp,
+	//	),
+	//)
+	//if err != nil {
+	//	return err
+	//}
+	//
+	//_, err = shell.RunExecWithTimeout(
+	//	fmt.Sprintf(
+	//		"tc class add dev ifb0 parent 2: classid 2:%[1]v htb rate %[2]vmbit ceil %[2]vmbit",
+	//		hostNum, uploadSpeedMb,
+	//	),
+	//)
+	//if err != nil {
+	//	return err
+	//}
+	//
+	//_, err = shell.RunExecWithTimeout(
+	//	fmt.Sprintf(
+	//		"tc filter add dev ifb0 protocol ip parent 2: prio %[1]v u32 match ip src %[2]v flowid 2:%[1]v",
+	//		hostNum, peerIp,
+	//	),
+	//)
+	//if err != nil {
+	//	return err
+	//}
 
 	return nil
 }
