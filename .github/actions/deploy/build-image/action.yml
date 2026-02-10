@@ -13,17 +13,26 @@ inputs:
     description: 'Tag for the built Docker image'
     required: true
 
+  dev-user:
+    description: "Username for SSH access to the development server (should be stored as a secret in the repository)"
+    required: true
+
+  dev-host:
+    description: 'Hostname or IP address of the development server (should be stored as a secret in the repository)'
+    required: true
+
 runs:
   using: "composite"
   steps:
     - name: Move Dockerfile
       shell: bash
       run: |
-        ssh ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }} "mkdir -p ${{ inputs.dockerfile_destination }}"
-        scp ${{ inputs.dockerfile_source }} ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }}:${{ inputs.dockerfile_destination }}
+        ssh ${{ inputs.dev-user }}@${{ inputs.dev-host }} "mkdir -p "$(dirname "${{ inputs.dockerfile_destination }}")""
+        scp ${{ inputs.dockerfile_source }} ${{ inputs.dev-user }}@${{ inputs.dev-host }}:${{ inputs.dockerfile_destination }}
 
     - name: Build deploy image
       shell: bash
       run: |
         ssh ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }} "
           docker build -t ${{ inputs.image_tag }} -f ${{ inputs.dockerfile_destination }} .
+        "

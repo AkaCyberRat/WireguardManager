@@ -10,6 +10,14 @@ inputs:
     description: "Destination path to folder with resources"
     required: true
 
+  dev-user:
+    description: "Username for SSH access to the development server (should be stored as a secret in the repository)"
+    required: true
+
+  dev-host:
+    description: 'Hostname or IP address of the development server (should be stored as a secret in the repository)'
+    required: true
+
 
 runs:
   using: "composite"
@@ -17,5 +25,5 @@ runs:
     - name: Transfer deploy resources
       shell: bash
       run: |
-        ssh ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }} "mkdir -p ${{ inputs.resources_destination }}"
-        scp ${{ inputs.resources_source }} ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }}:${{ inputs.resources_destination }}
+        ssh ${{ inputs.dev-user }}@${{ inputs.dev-host }} "mkdir -p ${{ inputs.resources_destination }}"
+        scp -r ${{ inputs.resources_source }} ${{ inputs.dev-user }}@${{ inputs.dev-host }}:${{ inputs.resources_destination }}

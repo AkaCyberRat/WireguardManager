@@ -5,6 +5,13 @@ inputs:
     description: 'Name of the Docker container instance to stop and remove'
     required: true
 
+  dev-user:
+    description: "Username for SSH access to the development server (should be stored as a secret in the repository)"
+    required: true
+
+  dev-host:
+    description: 'Hostname or IP address of the development server (should be stored as a secret in the repository)'
+    required: true
 
 runs:
   using: "composite"
@@ -12,7 +19,7 @@ runs:
     - name: Teardown current instance (if exists)
       shell: bash
       run: |
-        ssh ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }} "
+        ssh ${{ inputs.dev-user }}@${{ inputs.dev-host }} "
         docker stop ${{ inputs.container_name }} || true
         docker rm -f ${{ inputs.container_name }} || true
         "

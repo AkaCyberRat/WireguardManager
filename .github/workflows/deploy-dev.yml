@@ -11,8 +11,15 @@ jobs:
   build-and-deploy-wg-setup:
     runs-on: ubuntu-22.04
     steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+
       - name: Setup SSH
         uses: ./.github/actions/deploy/setup-ssh
+        with:
+          dev-host: ${{ secrets.DEV_HOST }}
+          ssh-private-key: ${{ secrets.DEV_SSH_KEY }}
 
 
       - name: Build app binary
@@ -39,19 +46,25 @@ jobs:
           dockerfile_source: ./deploy/Dockerfile
           dockerfile_destination: /tmp/wg-setup/Dockerfile
           image_tag: wg-base:dev
+          dev-user: ${{ secrets.DEV_USER }}
+          dev-host: ${{ secrets.DEV_HOST }}
 
 
       - name: Teardown current instance
         uses: ./.github/actions/deploy/teardown-instance
         with:
           container_name: wg-setup
+          dev-user: ${{ secrets.DEV_USER }}
+          dev-host: ${{ secrets.DEV_HOST }}
 
 
       - name: Transfer deploy resources
         uses: ./.github/actions/deploy/transfer-resources
         with:
-          resources_source: .deploy_data/
+          resources_source: ./deploy_data/
           resources_destination: /var/www/wg-setup/
+          dev-user: ${{ secrets.DEV_USER }}
+          dev-host: ${{ secrets.DEV_HOST }}
 
 
       - name: Launch new instance
@@ -63,3 +76,5 @@ jobs:
           entrypoint_flags: --config ./config.json
           resources_path: /var/www/wg-setup/
           container_port: "51830:51820/udp"
+          dev-user: ${{ secrets.DEV_USER }}
+          dev-host: ${{ secrets.DEV_HOST }}

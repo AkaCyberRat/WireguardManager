@@ -27,13 +27,21 @@ inputs:
     description: 'Map host port to the container WireGuard port ( e.g., "51820:51820/udp" )'
     required: true
 
+  dev-user:
+    description: "Username for SSH access to the development server (should be stored as a secret in the repository)"
+    required: true
+
+  dev-host:
+    description: 'Hostname or IP address of the development server (should be stored as a secret in the repository)'
+    required: true
+
 runs:
   using: "composite"
   steps:
     - name: Turn on new instance
       shell: bash
       run: |
-        ssh ${{ secrets.DEV_USER }}@${{ secrets.DEV_HOST }} "
+        ssh ${{ inputs.dev-user }}@${{ inputs.dev-host }} "
         docker run -d \
           --name ${{ inputs.container_name }} \
           --privileged \

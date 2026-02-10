@@ -1,15 +1,24 @@
 name: Setup SSH
 
+inputs:
+  dev-host:
+    description: 'Hostname or IP address of the development server (should be stored as a secret in the repository)'
+    required: true
+
+  ssh-private-key:
+    description: 'SSH private key for authentication (should be stored as a secret in the repository)'
+    required: true
+
 runs:
   using: "composite"
   steps:
     - name: Setup SSH private key
       uses: webfactory/ssh-agent@v0.9.1
       with:
-        ssh-private-key: ${{ secrets.DEV_SSH_KEY }}
+        ssh-private-key: ${{ inputs.ssh-private-key }}
 
     - name: Setup SSH known hosts
       shell: bash
       run: |
         mkdir -p ~/.ssh
-        ssh-keyscan -H ${{ secrets.DEV_HOST }} >> ~/.ssh/known_hosts
+        ssh-keyscan -H ${{ inputs.dev-host }} >> ~/.ssh/known_hosts
