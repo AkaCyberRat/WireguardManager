@@ -124,7 +124,30 @@ func SetupTcBase(wgInf string) error {
 	//
 	// Add tc base rule to limit client upload bandwidth (server download)
 	//
-	_, err = shell.RunExecWithTimeout(fmt.Sprintf("tc qdisc add dev %s ingress", wgInf))
+	//_, err = shell.RunExecWithTimeout(fmt.Sprintf("tc qdisc add dev %s ingress", wgInf))
+	//if err != nil {
+	//	return err
+	//}
+
+	// wg ingress (только redirect)
+	_, err = shell.RunExecWithTimeout(
+		fmt.Sprintf("tc qdisc add dev %s ingress", wgInf),
+	)
+	if err != nil {
+		return err
+	}
+
+	// IFB
+	_, _ = shell.RunExecWithTimeout("ip link add ifb0 type ifb")
+	_, err = shell.RunExecWithTimeout("ip link set ifb0 up")
+	if err != nil {
+		return err
+	}
+
+	// IFB egress (upload клиента)
+	_, err = shell.RunExecWithTimeout(
+		"tc qdisc add dev ifb0 root handle 2: htb",
+	)
 	if err != nil {
 		return err
 	}
@@ -167,15 +190,45 @@ func ApplyTcForPeer(wgInf string, peerIp net.IP, serverNetworkMask net.IPMask, d
 
 	// Limit upload bandwidth (for server ingress/download)
 
-	_, err = shell.RunExecWithTimeout(fmt.Sprintf("tc filter add dev %s protocol ip ingress prio %v u32 match ip src %v action police rate %vmbit burst 50mbit", wgInf, hostNum, peerIp, uploadSpeedMb))
-	if err != nil {
-		return err
-	}
+	//_, err = shell.RunExecWithTimeout(fmt.Sprintf("tc filter add dev %s protocol ip ingress prio %v u32 match ip src %v action police rate %vmbit burst 50mbit", wgInf, hostNum, peerIp, uploadSpeedMb))
+	//if err != nil {
+	//	return err
+	//}
 
 	//_, err = shell.RunExecWithTimeout(fmt.Sprintf("tc filter add dev %s protocol ip ingress prio %v u32 match ip dst %v action police rate %vmbit burst 5mbit", wgInf, hostNum, peerIp, uploadSpeedMb))
 	//if err != nil {
 	//	return err
 	//}
+
+	_, err = shell.RunExecWithTimeout(
+		fmt.Sprintf(
+			"tc filter add dev %s ingress prio %v u32 match ip src %v action mirred egress redirect dev ifb0",
+			wgInf, hostNum, peerIp,
+		),
+	)
+	if err != nil {
+		return err
+	}
+
+	_, err = shell.RunExecWithTimeout(
+		fmt.Sprintf(
+			"tc class add dev ifb0 parent 2: classid 2:%[1]v htb rate %[2]vmbit ceil %[2]vmbit",
+			hostNum, uploadSpeedMb,
+		),
+	)
+	if err != nil {
+		return err
+	}
+
+	_, err = shell.RunExecWithTimeout(
+		fmt.Sprintf(
+			"tc filter add dev ifb0 protocol ip parent 2: prio %[1]v u32 match ip src %[2]v flowid 2:%[1]v",
+			hostNum, peerIp,
+		),
+	)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -202,6 +255,19 @@ func DiscardTcForPeer(wgInf string, peerIp net.IP, serverNetworkMask net.IPMask)
 		return err
 	}
 
+	// wg ingress redirect
+	_, _ = shell.RunExecWithTimeout(
+		fmt.Sprintf("tc filter del dev %s ingress prio %v", wgInf, hostNum),
+	)
+
+	// ifb
+	_, _ = shell.RunExecWithTimeout(
+		fmt.Sprintf("tc filter del dev ifb0 parent 2: prio %v", hostNum),
+	)
+	_, _ = shell.RunExecWithTimeout(
+		fmt.Sprintf("tc class del dev ifb0 parent 2: classid 2:%v", hostNum),
+	)
+
 	return nil
 }
 
@@ -219,6 +285,16 @@ func hostNumber(ip net.IP, mask net.IPMask) uint32 {
 	// host number = ip & ^mask
 	return ipUint & ^maskUint
 }
+
+//modprobe ifb
+//ip link add ifb0 type ifb
+//ip link set ifb0 up
+//
+//tc qdisc add dev wg0 handle ffff: ingress
+//tc filter add dev wg0 parent ffff: protocol ip u32 match ip src PEER_IP action mirred egress redirect dev ifb0
+//
+//tc qdisc add dev ifb0 root handle 1: htb
+//tc class add dev ifb0 parent 1: classid 1:1 htb rate 100mbit ceil 100mbit
 
 func getIpIndex(ip string) int {
 	octs := strings.Split(ip, ".")
