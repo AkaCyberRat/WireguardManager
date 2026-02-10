@@ -167,7 +167,7 @@ func ApplyTcForPeer(wgInf string, peerIp net.IP, serverNetworkMask net.IPMask, d
 
 	// Limit upload bandwidth (for server ingress/download)
 
-	_, err = shell.RunExecWithTimeout(fmt.Sprintf("tc filter add dev %s protocol ip ingress prio %v u32 match ip src %v action police rate %vmbit burst 5mbit", wgInf, hostNum, peerIp, uploadSpeedMb))
+	_, err = shell.RunExecWithTimeout(fmt.Sprintf("tc filter add dev %s protocol ip ingress prio %v u32 match ip src %v action police rate %vmbit burst 50mbit", wgInf, hostNum, peerIp, uploadSpeedMb))
 	if err != nil {
 		return err
 	}
