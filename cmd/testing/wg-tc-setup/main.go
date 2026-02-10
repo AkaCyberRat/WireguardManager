@@ -65,6 +65,12 @@ func main() {
 	}
 	logrus.Infof("Server enabled")
 
+	// Setup TC base
+	if err := network.SetupTcBase(WgInfName); err != nil {
+		logrus.Fatal("Failed to setup tc base: ", err.Error())
+	}
+	logrus.Infof("Tc base enabled")
+
 	// Setup NAT for wg interface
 
 	wgNetPrefix := netip.MustParsePrefix(fmt.Sprintf("%s/%d", WgServerIp, WgServerMask))

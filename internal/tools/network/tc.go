@@ -112,6 +112,27 @@ func (t *Tool) tcPeerDown(ip string) error {
 	return nil
 }
 
+func SetupTcBase(wgInf string) error {
+	//
+	// Add tc base rule to limit client download bandwidth (server upload)
+	//
+	_, err := shell.RunExecWithTimeout(fmt.Sprintf("tc qdisc add dev %s root handle 1: htb", wgInf))
+	if err != nil {
+		return err
+	}
+
+	//
+	// Add tc base rule to limit client upload bandwidth (server download)
+	//
+	_, err = shell.RunExecWithTimeout(fmt.Sprintf("tc qdisc add dev %s ingress", wgInf))
+	if err != nil {
+		return err
+	}
+
+	logrus.Tracef("Traffic control rules for server enabled.")
+	return nil
+}
+
 // ApplyTcForPeer applies traffic control rules for a peer with the given IP address, download speed, and upload speed.
 // It calculates the host number based on the peer's IP and the server's network mask, and then uses that host number to create unique tc rules for that peer.
 //
