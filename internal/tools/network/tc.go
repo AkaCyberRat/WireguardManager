@@ -172,10 +172,10 @@ func ApplyTcForPeer(wgInf string, peerIp net.IP, serverNetworkMask net.IPMask, d
 		return err
 	}
 
-	_, err = shell.RunExecWithTimeout(fmt.Sprintf("tc filter add dev %s protocol ip ingress prio %v u32 match ip dst %v action police rate %vmbit burst 5mbit", wgInf, hostNum, peerIp, uploadSpeedMb))
-	if err != nil {
-		return err
-	}
+	//_, err = shell.RunExecWithTimeout(fmt.Sprintf("tc filter add dev %s protocol ip ingress prio %v u32 match ip dst %v action police rate %vmbit burst 5mbit", wgInf, hostNum, peerIp, uploadSpeedMb))
+	//if err != nil {
+	//	return err
+	//}
 
 	return nil
 }
