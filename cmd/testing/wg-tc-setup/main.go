@@ -19,10 +19,12 @@ type Configuration struct {
 	PeerPublicKey    string
 	ServerPrivateKey string
 	ServerPort       int
-	Peers            []struct {
-		Ip    string
-		Speed int
-	}
+	Peers            []Peer
+}
+
+type Peer struct {
+	Ip    string
+	Speed int
 }
 
 func (c Configuration) ToDefault() config.Configuration {
@@ -40,6 +42,8 @@ func main() {
 	const WgPeerMask = 32
 
 	logging.SetTempConfiguration()
+
+	logrus.Info("Starting wg-tc-setup")
 
 	// Load configuration
 

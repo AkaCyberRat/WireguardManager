@@ -33,10 +33,11 @@ func (c Configuration) Validate() error {
 func main() {
 	const GwInfName, WgInfName = "eth0", "wg0"
 	const WgServerIp, WgServerMask = "11.0.0.1", 24
-
 	const WgPeerIp, WgPeerMask = "11.0.0.2", 32
 
 	logging.SetTempConfiguration()
+
+	logrus.Info("Starting wg-setup")
 
 	// Load configuration
 

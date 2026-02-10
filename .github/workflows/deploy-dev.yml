@@ -143,7 +143,7 @@ jobs:
         uses: ./.github/actions/deploy/launch-instance
         with:
           image_tag: wg-base:dev
-          container_name: wg-setup
+          container_name: wg-tc-setup
           entrypoint: /app/app
           entrypoint_flags: --config ./config.json
           resources_path: /var/www/wg-setup/

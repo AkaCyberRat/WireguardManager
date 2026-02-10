@@ -23,4 +23,4 @@ runs:
     - name: Build binary
       shell: bash
       run: |
-        go build -o ${{ inputs.output_path }} ./${{ inputs.build_target }}
+        go build -o ${{ inputs.output_path }} ${{ inputs.build_target }}
