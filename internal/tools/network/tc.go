@@ -121,49 +121,37 @@ func SetupTcBase(wgInf string) error {
 		return err
 	}
 
-	//
-	// Add tc base rule to limit client upload bandwidth (server download)
-	//
-	//_, err = shell.RunExecWithTimeout(fmt.Sprintf("tc qdisc add dev %s ingress", wgInf))
-	//if err != nil {
-	//	return err
-	//}
+	ifbInf := "ifb0"
+	rootRate := "100gbit"
 
-	// wg ingress (только redirect)
-	_, err = shell.RunExecWithTimeout(
-		fmt.Sprintf("tc qdisc add dev %s ingress", wgInf),
-	)
-	if err != nil {
-		return err
+	commands := []string{
+		// IFB
+		fmt.Sprintf("ip link add %s type ifb", ifbInf),
+		fmt.Sprintf("ip link set %s up", ifbInf),
+
+		// redirect ingress
+		fmt.Sprintf("tc qdisc add dev %s handle ffff: ingress", wgInf),
+		fmt.Sprintf("tc filter add dev %s parent ffff: protocol ip u32 match ip src 0.0.0.0/0 action mirred egress redirect dev %s",
+			wgInf,
+
+			ifbInf,
+		),
+
+		// root HTB
+		fmt.Sprintf("tc qdisc add dev %s root handle 1: htb default 999", ifbInf),
+
+		// родительский класс (без реального лимита)
+		fmt.Sprintf(
+			"tc class add dev %s parent 1: classid 1:1 htb rate %s",
+			ifbInf, rootRate,
+		),
 	}
 
-	// IFB
-	_, _ = shell.RunExecWithTimeout("ip link add ifb0 type ifb")
-	_, err = shell.RunExecWithTimeout("ip link set ifb0 up")
-	if err != nil {
-		return err
+	for _, cmd := range commands {
+		if _, err := shell.RunExecWithTimeout(cmd); err != nil {
+			return err
+		}
 	}
-
-	// IFB egress (upload клиента)
-	_, err = shell.RunExecWithTimeout(
-		"tc qdisc add dev ifb0 root handle 2: htb",
-	)
-	if err != nil {
-		return err
-	}
-
-	//_, _ = shell.RunExecWithTimeout("ip link add ifb0 type ifb")
-	//_, err = shell.RunExecWithTimeout("ip link set ifb0 up")
-	//if err != nil {
-	//	return err
-	//}
-	//
-	//_, err = shell.RunExecWithTimeout(
-	//	"tc qdisc add dev ifb0 root cake bandwidth 100mbit",
-	//)
-	//if err != nil {
-	//	return err
-	//}
 
 	logrus.Tracef("Traffic control rules for server enabled.")
 	return nil
@@ -186,7 +174,7 @@ func ApplyTcForPeer(wgInf string, peerIp net.IP, serverNetworkMask net.IPMask, d
 
 	// Limit download bandwidth (for server egress/upload)
 
-	_, err := shell.RunExecWithTimeout(fmt.Sprintf("tc class add dev %[1]s parent 1: classid 1:%[2]v htb rate %[3]vmbit ceil %[3]vmbit", wgInf, hostNum, downloadSpeedMb))
+	_, err := shell.RunExecWithTimeout(fmt.Sprintf("tc class add dev %[1]s parent 1:1 classid 1:%[2]v htb rate %[3]vmbit ceil %[3]vmbit", wgInf, hostNum, downloadSpeedMb))
 	if err != nil {
 		return err
 	}
@@ -201,47 +189,20 @@ func ApplyTcForPeer(wgInf string, peerIp net.IP, serverNetworkMask net.IPMask, d
 		return err
 	}
 
-	// Works but constantly low speed about 5mb
-	// Limit upload bandwidth (for server ingress/download)
-	//_, err = shell.RunExecWithTimeout(fmt.Sprintf("tc filter add dev %s protocol ip ingress prio %v u32 match ip src %v action police rate %vmbit burst 50mbit", wgInf, hostNum, peerIp, uploadSpeedMb))
-	//if err != nil {
-	//	return err
-	//}
+	ifbInf := "ifb0"
+	classId := hostNum
 
-	//_, err = shell.RunExecWithTimeout(fmt.Sprintf("tc filter add dev %s protocol ip ingress prio %v u32 match ip dst %v action police rate %vmbit burst 5mbit", wgInf, hostNum, peerIp, uploadSpeedMb))
-	//if err != nil {
-	//	return err
-	//}
-
-	// Works but low precision of speed
-	_, err = shell.RunExecWithTimeout(
-		fmt.Sprintf(
-			"tc filter add dev %s ingress prio %v u32 match ip src %v action mirred egress redirect dev ifb0",
-			wgInf, hostNum, peerIp,
-		),
-	)
-	if err != nil {
-		return err
+	// класс
+	commands := []string{
+		fmt.Sprintf("tc class add dev %s parent 1: classid 1:%d htb rate %vmbit ceil %vmbit", ifbInf, classId, uploadSpeedMb, uploadSpeedMb),
+		fmt.Sprintf("tc filter add dev %s parent 1: protocol ip prio 1 u32 match ip src %s flowid 1:%d", ifbInf, peerIp, classId),
+		fmt.Sprintf("tc qdisc add dev %s parent 1:%d fq_codel", ifbInf, classId),
 	}
 
-	_, err = shell.RunExecWithTimeout(
-		fmt.Sprintf(
-			"tc class add dev ifb0 parent 2: classid 2:%[1]v htb rate %[2]vmbit ceil %[2]vmbit quantum 3000",
-			hostNum, uploadSpeedMb,
-		),
-	)
-	if err != nil {
-		return err
-	}
-
-	_, err = shell.RunExecWithTimeout(
-		fmt.Sprintf(
-			"tc filter add dev ifb0 protocol ip parent 2: prio %[1]v u32 match ip src %[2]v flowid 2:%[1]v",
-			hostNum, peerIp,
-		),
-	)
-	if err != nil {
-		return err
+	for _, cmd := range commands {
+		if _, err := shell.RunExecWithTimeout(cmd); err != nil {
+			return err
+		}
 	}
 
 	return nil

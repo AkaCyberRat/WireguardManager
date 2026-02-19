@@ -102,7 +102,7 @@ func main() {
 
 	}
 
-	// Wait for exit signal
+	// Wait for exit  signal
 	waitForExitSignal()
 
 	logrus.Info("Shutting down")
