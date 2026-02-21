@@ -94,18 +94,17 @@ func (t *Tool) tcPeerUp(ip string, downloadSpeed int, uploadSpeed int) error {
 func (t *Tool) tcPeerDown(ip string) error {
 	ind := getIpIndex(ip)
 
-	_, err := shell.RunExecWithTimeout(fmt.Sprintf("tc filter del dev %s parent 1: prio %v", t.interfaceName, ind))
-	if err != nil {
-		return err
-	}
-	_, err = shell.RunExecWithTimeout(fmt.Sprintf("tc filter del dev %s ingress prio %v", t.interfaceName, ind))
-	if err != nil {
-		return err
+	commands := []string{
+		fmt.Sprintf("tc filter del dev %s parent 1: prio %v", t.interfaceName, ind),
+		fmt.Sprintf("tc filter del dev %s ingress prio %v", t.interfaceName, ind),
+		fmt.Sprintf("tc class del dev %s parent 1: classid 1:%v", t.interfaceName, ind),
 	}
 
-	_, err = shell.RunExecWithTimeout(fmt.Sprintf("tc class del dev %s parent 1: classid 1:%v", t.interfaceName, ind))
-	if err != nil {
-		return err
+	for _, command := range commands {
+		_, err := shell.RunExecWithTimeout(command)
+		if err != nil {
+			return err
+		}
 	}
 
 	logrus.Tracef("Traffic control rules for peer disabled. [Ip=%v]", ip)
@@ -113,38 +112,34 @@ func (t *Tool) tcPeerDown(ip string) error {
 }
 
 func SetupTcBase(wgInf string) error {
-	//
-	// Add tc base rule to limit client download bandwidth (server upload)
-	//
-	_, err := shell.RunExecWithTimeout(fmt.Sprintf("tc qdisc add dev %s root handle 1: htb", wgInf))
-	if err != nil {
-		return err
-	}
-
-	ifbInf := "ifb0"
-	rootRate := "100gbit"
+	const ifbInf = "ifb0"
+	const rootRate = "100gbit"
 
 	commands := []string{
-		// IFB
+		//
+		// 		Add base rule(s) to limit server egress (client download bandwidth)
+		//
+
+		// Create root HTB qdisc for wg interface
+		fmt.Sprintf("tc qdisc add dev %s root handle 1: htb", wgInf),
+
+		//
+		// 		Add base rule(s) to limit server ingress (client upload bandwidth)
+		//
+
+		// Create and up IFB interface
 		fmt.Sprintf("ip link add %s type ifb", ifbInf),
 		fmt.Sprintf("ip link set %s up", ifbInf),
 
-		// redirect ingress
+		// Create ingress qdisc and filter on wg interface and redirect all ingress traffic to IFB interface
 		fmt.Sprintf("tc qdisc add dev %s handle ffff: ingress", wgInf),
-		fmt.Sprintf("tc filter add dev %s parent ffff: protocol ip u32 match ip src 0.0.0.0/0 action mirred egress redirect dev %s",
-			wgInf,
+		fmt.Sprintf("tc filter add dev %s parent ffff: protocol ip u32 match ip src 0.0.0.0/0 action mirred egress redirect dev %s", wgInf, ifbInf),
 
-			ifbInf,
-		),
-
-		// root HTB
+		// Create root HTB qdisc for IFB interface to shape ingress traffic
 		fmt.Sprintf("tc qdisc add dev %s root handle 1: htb default 999", ifbInf),
 
-		// родительский класс (без реального лимита)
-		fmt.Sprintf(
-			"tc class add dev %s parent 1: classid 1:1 htb rate %s",
-			ifbInf, rootRate,
-		),
+		// Create default class with very high rate to avoid shaping traffic without specific rules
+		fmt.Sprintf("tc class add dev %s parent 1: classid 1:1 htb rate %s", ifbInf, rootRate),
 	}
 
 	for _, cmd := range commands {
@@ -170,35 +165,34 @@ func SetupTcBase(wgInf string) error {
 //
 // - 'uploadSpeedMb' is the upload speed limit for the peer in megabits per second (e.g. 50)
 func ApplyTcForPeer(wgInf string, peerIp net.IP, serverNetworkMask net.IPMask, downloadSpeedMb int, uploadSpeedMb int) error {
+	const ifbInf = "ifb0"
 	hostNum := hostNumber(peerIp, serverNetworkMask)
 
-	// Limit download bandwidth (for server egress/upload)
-
-	_, err := shell.RunExecWithTimeout(fmt.Sprintf("tc class add dev %[1]s parent 1:1 classid 1:%[2]v htb rate %[3]vmbit ceil %[3]vmbit", wgInf, hostNum, downloadSpeedMb))
-	if err != nil {
-		return err
-	}
-
-	_, err = shell.RunExecWithTimeout(fmt.Sprintf("tc filter add dev %[1]s protocol ip parent 1: prio %[2]v u32 match ip src %[3]v flowid 1:%[2]v", wgInf, hostNum, peerIp))
-	if err != nil {
-		return err
-	}
-
-	_, err = shell.RunExecWithTimeout(fmt.Sprintf("tc filter add dev %[1]s protocol ip parent 1: prio %[2]v u32 match ip dst %[3]v flowid 1:%[2]v", wgInf, hostNum, peerIp))
-	if err != nil {
-		return err
-	}
-
-	ifbInf := "ifb0"
-	classId := hostNum
-
-	// класс
 	commands := []string{
-		fmt.Sprintf("tc class add dev %s parent 1: classid 1:%d htb rate %vmbit ceil %vmbit", ifbInf, classId, uploadSpeedMb, uploadSpeedMb),
-		fmt.Sprintf("tc filter add dev %s parent 1: protocol ip prio 1 u32 match ip src %s flowid 1:%d", ifbInf, peerIp, classId),
-		fmt.Sprintf("tc qdisc add dev %s parent 1:%d fq_codel", ifbInf, classId),
+		//
+		// 		Add rules to limit server egress for peer (client download bandwidth)
+		//
+
+		// Create class for peer with specified download speed
+		fmt.Sprintf("tc class add dev %[1]s parent 1:1 classid 1:%[2]v htb rate %[3]vmbit ceil %[3]vmbit", wgInf, hostNum, downloadSpeedMb),
+
+		// Create filters to direct traffic to peer to the class
+		fmt.Sprintf("tc filter add dev %[1]s protocol ip parent 1: prio %[2]v u32 match ip src %[3]v flowid 1:%[2]v", wgInf, hostNum, peerIp),
+		fmt.Sprintf("tc filter add dev %[1]s protocol ip parent 1: prio %[2]v u32 match ip dst %[3]v flowid 1:%[2]v", wgInf, hostNum, peerIp),
+
+		//
+		// 		Add rules to limit server ingress for peer (client upload bandwidth)
+		//
+
+		// Create class for peer with specified upload speed
+		fmt.Sprintf("tc class add dev %s parent 1: classid 1:%d htb rate %vmbit ceil %vmbit", ifbInf, hostNum, uploadSpeedMb, uploadSpeedMb),
+
+		// Create filters to direct traffic from peer to the class
+		fmt.Sprintf("tc filter add dev %s parent 1: protocol ip prio 1 u32 match ip src %s flowid 1:%d", ifbInf, peerIp, hostNum),
+		fmt.Sprintf("tc qdisc add dev %s parent 1:%d fq_codel", ifbInf, hostNum),
 	}
 
+	// TODO: Add error context
 	for _, cmd := range commands {
 		if _, err := shell.RunExecWithTimeout(cmd); err != nil {
 			return err
@@ -214,6 +208,7 @@ func ApplyTcForPeer(wgInf string, peerIp net.IP, serverNetworkMask net.IPMask, d
 // - 'wgInf' is the name of the Wireguard interface (e.g. 'wg0')
 //
 // - 'peerIp' is the IP address of the peer (e.g. '11.0.0.1')
+// TODO: Actualize
 func DiscardTcForPeer(wgInf string, peerIp net.IP, serverNetworkMask net.IPMask) error {
 	hostNum := hostNumber(peerIp, serverNetworkMask)
 
