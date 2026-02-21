@@ -24,7 +24,7 @@ func SetTempConfiguration() {
 		HideKeys:        true,
 		NoColors:        true,
 		ShowFullLevel:   true,
-		TimestampFormat: "2006-01-02 15:04:05.999 \t",
+		TimestampFormat: "2006-01-02 15:04:05.000",
 	}
 
 	logrus.SetFormatter(formatter)
