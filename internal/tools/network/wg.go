@@ -2,6 +2,7 @@ package network
 
 import (
 	"errors"
+	"fmt"
 	"golang.zx2c4.com/wireguard/wgctrl"
 	"net"
 	"net/netip"
@@ -340,43 +341,25 @@ func RemoveWgPeer(wgInf string, ip net.IP, mask net.IPMask, publicKey string) er
 //
 // - wgNet is the CIDR prefix of wg network (e.g. '11.0.0.0/24')
 func SetupWgNAT(wgInf string, gwInf string, wgPort int, wgNet netip.Prefix) error {
-	if err := shell.RunBlockingExec(
-		"iptables",
-		"-t", "nat",
-		"-A", "POSTROUTING",
-		"-s", wgNet,
-		"-o", gwInf,
-		"-j", "MASQUERADE",
-	); err != nil {
-		return err
+	commands := []string{
+		// NAT for wg interface
+		fmt.Sprintf("iptables -t nat -A POSTROUTING -s %v -o %v -j MASQUERADE", wgNet, gwInf),
+		fmt.Sprintf("iptables -A INPUT -p udp -m udp --dport %v -j ACCEPT", wgPort),
+		fmt.Sprintf("iptables -A FORWARD -i %v -j ACCEPT", wgInf),
+		fmt.Sprintf("iptables -A FORWARD -o %v -j ACCEPT", wgInf),
+
+		// DNS redirect
+		fmt.Sprintf("iptables -t nat -A PREROUTING -i %v -p udp --dport 53 -j DNAT --to-destination 8.8.8.8:53", wgInf),
+		fmt.Sprintf("iptables -t nat -A PREROUTING -i %v -p tcp --dport 53 -j DNAT --to-destination 8.8.8.8:53", wgInf),
 	}
 
-	if err := shell.RunBlockingExec(
-		"iptables",
-		"-A", "INPUT",
-		"-p", "udp",
-		"-m", "udp",
-		"--dport", wgPort,
-		"-j", "ACCEPT",
-	); err != nil {
-		return err
+	for _, command := range commands {
+		if _, err := shell.RunExecWithTimeout(command); err != nil {
+			return err
+		}
 	}
 
-	if err := shell.RunBlockingExec(
-		"iptables",
-		"-A", "FORWARD",
-		"-i", wgInf,
-		"-j", "ACCEPT",
-	); err != nil {
-		return err
-	}
-
-	return shell.RunBlockingExec(
-		"iptables",
-		"-A", "FORWARD",
-		"-o", wgInf,
-		"-j", "ACCEPT",
-	)
+	return nil
 }
 
 //
