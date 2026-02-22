@@ -10,6 +10,7 @@ require (
 	github.com/gin-gonic/gin v1.9.1-0.20230221094249-0b5df9fc3992
 	github.com/go-playground/validator/v10 v10.11.2
 	github.com/golang-jwt/jwt/v4 v4.5.2
+	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/google/uuid v1.3.0
 	github.com/knadh/koanf v1.5.0
 	github.com/sirupsen/logrus v1.9.0

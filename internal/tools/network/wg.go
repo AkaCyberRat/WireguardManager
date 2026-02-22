@@ -10,6 +10,7 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl"
 
 	"github.com/coreos/go-iptables/iptables"
+	"github.com/google/shlex"
 	"github.com/sirupsen/logrus"
 	"github.com/vishvananda/netlink"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -347,19 +348,25 @@ func SetupWgNAT(wgInf string, gwInf string, wgPort int, wgNet netip.Prefix) erro
 		return err
 	}
 
-	ipt_commands := [][]string{
-		{"nat", "POSTROUTING", fmt.Sprintf("-s %v -o %v -j MASQUERADE", wgNet, gwInf)},
-		{"filter", "INPUT", fmt.Sprintf("-p udp -m udp --dport %v -j ACCEPT", wgPort)},
-		{"filter", "FORWARD", fmt.Sprintf("-i %v -j ACCEPT", wgInf)},
-		{"filter", "FORWARD", fmt.Sprintf("-o %v -j ACCEPT", wgInf)},
+	iptables_commands := []string{
+		// NAT for wg interface
+		fmt.Sprintf("-t nat -A POSTROUTING -s %v -o %v -j MASQUERADE", wgNet, gwInf),
+		fmt.Sprintf("-t filter -A INPUT -p udp -m udp --dport %v -j ACCEPT", wgPort),
+		fmt.Sprintf("-t filter -A FORWARD -i %v -j ACCEPT", wgInf),
+		fmt.Sprintf("-t filter -A FORWARD -o %v -j ACCEPT", wgInf),
 
 		// DNS redirect
-		{"nat", "PREROUTING", fmt.Sprintf("-i %v -p udp --dport 53 -j DNAT --to-destination 8.8.8.8:53", wgInf)},
-		{"nat", "PREROUTING", fmt.Sprintf("-i %v -p tcp --dport 53 -j DNAT --to-destination 8.8.8.8:53", wgInf)},
+		fmt.Sprintf("-t nat -A PREROUTING -i %v -p udp --dport 53 -j DNAT --to-destination 8.8.8.8:53", wgInf),
+		fmt.Sprintf("-t nat -A PREROUTING -i %v -p tcp --dport 53 -j DNAT --to-destination 8.8.8.8:53", wgInf),
 	}
 
-	for _, cmd := range ipt_commands {
-		if err = ipt.AppendUnique(cmd[0], cmd[1], cmd[2]); err != nil {
+	for _, command := range iptables_commands {
+		args, _ := shlex.Split(command)
+		if err != nil {
+			return err
+		}
+
+		if err = ipt.AppendUnique(args[1], args[3], command[4:]); err != nil {
 			return err
 		}
 	}
