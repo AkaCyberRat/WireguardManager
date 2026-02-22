@@ -366,7 +366,7 @@ func SetupWgNAT(wgInf string, gwInf string, wgPort int, wgNet netip.Prefix) erro
 			return err
 		}
 
-		if err = ipt.AppendUnique(args[1], args[3], command[4:]); err != nil {
+		if err = ipt.AppendUnique(args[1], args[3], args[4:]...); err != nil {
 			return err
 		}
 	}
