@@ -3,16 +3,16 @@ package network
 import (
 	"errors"
 	"fmt"
-	"golang.zx2c4.com/wireguard/wgctrl"
 	"net"
 	"net/netip"
 	"strings"
 
+	"golang.zx2c4.com/wireguard/wgctrl"
+
+	"github.com/coreos/go-iptables/iptables"
 	"github.com/sirupsen/logrus"
 	"github.com/vishvananda/netlink"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
-
-	"WireguardManager/pkg/shell"
 )
 
 const (
@@ -341,20 +341,25 @@ func RemoveWgPeer(wgInf string, ip net.IP, mask net.IPMask, publicKey string) er
 //
 // - wgNet is the CIDR prefix of wg network (e.g. '11.0.0.0/24')
 func SetupWgNAT(wgInf string, gwInf string, wgPort int, wgNet netip.Prefix) error {
-	commands := []string{
-		// NAT for wg interface
-		fmt.Sprintf("iptables -t nat -A POSTROUTING -s %v -o %v -j MASQUERADE", wgNet, gwInf),
-		fmt.Sprintf("iptables -A INPUT -p udp -m udp --dport %v -j ACCEPT", wgPort),
-		fmt.Sprintf("iptables -A FORWARD -i %v -j ACCEPT", wgInf),
-		fmt.Sprintf("iptables -A FORWARD -o %v -j ACCEPT", wgInf),
 
-		// DNS redirect
-		fmt.Sprintf("iptables -t nat -A PREROUTING -i %v -p udp --dport 53 -j DNAT --to-destination 8.8.8.8:53", wgInf),
-		fmt.Sprintf("iptables -t nat -A PREROUTING -i %v -p tcp --dport 53 -j DNAT --to-destination 8.8.8.8:53", wgInf),
+	ipt, err := iptables.New()
+	if err != nil {
+		return err
 	}
 
-	for _, command := range commands {
-		if _, err := shell.RunExecWithTimeout(command); err != nil {
+	ipt_commands := [][]string{
+		{"nat", "POSTROUTING", fmt.Sprintf("-s %v -o %v -j MASQUERADE", wgNet, gwInf)},
+		{"filter", "INPUT", fmt.Sprintf("-p udp -m udp --dport %v -j ACCEPT", wgPort)},
+		{"filter", "FORWARD", fmt.Sprintf("-i %v -j ACCEPT", wgInf)},
+		{"filter", "FORWARD", fmt.Sprintf("-o %v -j ACCEPT", wgInf)},
+
+		// DNS redirect
+		{"nat", "PREROUTING", fmt.Sprintf("-i %v -p udp --dport 53 -j DNAT --to-destination 8.8.8.8:53", wgInf)},
+		{"nat", "PREROUTING", fmt.Sprintf("-i %v -p tcp --dport 53 -j DNAT --to-destination 8.8.8.8:53", wgInf)},
+	}
+
+	for _, cmd := range ipt_commands {
+		if err = ipt.AppendUnique(cmd[0], cmd[1], cmd[2]); err != nil {
 			return err
 		}
 	}

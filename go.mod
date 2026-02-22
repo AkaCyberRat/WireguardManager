@@ -6,10 +6,10 @@ toolchain go1.23.5
 
 require (
 	github.com/antonfisher/nested-logrus-formatter v1.3.1
+	github.com/coreos/go-iptables v0.8.0
 	github.com/gin-gonic/gin v1.9.1-0.20230221094249-0b5df9fc3992
 	github.com/go-playground/validator/v10 v10.11.2
 	github.com/golang-jwt/jwt/v4 v4.5.2
-	github.com/google/nftables v0.3.0
 	github.com/google/uuid v1.3.0
 	github.com/knadh/koanf v1.5.0
 	github.com/sirupsen/logrus v1.9.0
