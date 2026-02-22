@@ -24,37 +24,8 @@ example_run: example_build
 	 ./.bin/example/main
 
 
-lint-check:
-	@start=$$(date +%s); \
-	docker run --rm \
-		-v "$(CURDIR):/app" \
-		-v "$(HOME)/go/pkg/mod:/go/pkg/mod" \
-		-v "$(HOME)/.cache/golangci-lint:/root/.cache" \
-		-w /app \
-		golangci/golangci-lint:v1.63.4 \
-		golangci-lint run ./... --config .golangci.yml; \
-	echo '"make lint-check" completed!'; \
-	end=$$(date +%s); \
-	elapsed=$$((end - start)); \
-	echo "Time: $$elapsed sec"
 
-
-lint-fix:
-	@start=$$(date +%s); \
-	docker run --rm \
-		-v "$(CURDIR):/app" \
-		-v "$(HOME)/go/pkg/mod:/go/pkg/mod" \
-		-v "$(HOME)/.cache/golangci-lint:/root/.cache" \
-		-w /app \
-		golangci/golangci-lint:v1.63.4 \
-		golangci-lint run ./... --config .golangci.yml --fix; \
-	echo '"make lint-fix" completed!'; \
-	end=$$(date +%s); \
-	elapsed=$$((end - start)); \
-	echo "Time: $$elapsed sec"
-
-
-lint-check-windows:
+lint:
 	docker run -it \
 		--rm \
 		-v "$(CURDIR):/app" \
@@ -69,3 +40,22 @@ lint-check-windows:
 			end=$$(date +%s); \
 			elapsed=$$((end - start)); \
 			echo "Lint completed! Time: $$elapsed sec"'
+
+
+
+lint-fix:
+	docker run -it \
+		--rm \
+		-v "$(CURDIR):/app" \
+		-v golangci-lint-cache:/root/.cache \
+		-v go-mod-cache:/go/pkg/mod \
+		-w /app \
+		--name golangci-lint-container \
+		golangci/golangci-lint:v1.63.4 \
+		bash -c 'start=$$(date +%s); \
+			echo "Starting golangci-lint --fix ..."; \
+			golangci-lint run ./... --config .golangci.yml --fix; \
+			end=$$(date +%s); \
+			elapsed=$$((end - start)); \
+			echo "Lint fix completed! Time: $$elapsed sec"'
+
