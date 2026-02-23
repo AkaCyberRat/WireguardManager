@@ -50,12 +50,17 @@ func main() {
 
 	// Setup Wg interface
 
+	wgService, err := network.NewWgService()
+	if err != nil {
+		logrus.Fatal("Failed to create WgService: ", err.Error())
+	}
+
 	wgServerIp := net.ParseIP(WgServerIp)
 	wgServerMask := net.CIDRMask(WgServerMask, 32)
 	serverPrivateKey := conf.ServerPrivateKey
 	port := conf.ServerPort
 
-	if err := network.SetupWgInterface(WgInfName, wgServerIp, wgServerMask, serverPrivateKey, port); err != nil {
+	if err := wgService.SetupWgInterface(WgInfName, wgServerIp, wgServerMask, serverPrivateKey, port); err != nil {
 		logrus.Fatal("Failed to setup Wg interface: ", err.Error())
 	}
 	logrus.Infof("Server enabled")
@@ -66,7 +71,7 @@ func main() {
 	wgPeerMask := net.CIDRMask(WgPeerMask, 32)
 	peerPublicKey := conf.PeerPublicKey
 
-	if err := network.AddWgPeer(WgInfName, wgPeerIp, wgPeerMask, peerPublicKey, nil); err != nil {
+	if err := wgService.AddWgPeer(WgInfName, wgPeerIp, wgPeerMask, peerPublicKey, nil); err != nil {
 		logrus.Fatal("Failed to add Wg peer: ", err.Error())
 	}
 	logrus.Infof("Peer enabled")
@@ -75,14 +80,14 @@ func main() {
 
 	wgNetPrefix := netip.MustParsePrefix(fmt.Sprintf("%s/%d", WgServerIp, WgServerMask))
 
-	if err := network.SetupWgNAT(WgInfName, GwInfName, port, wgNetPrefix); err != nil {
+	if err := wgService.SetupWgNAT(WgInfName, GwInfName, port, wgNetPrefix); err != nil {
 		logrus.Fatal("Failed to setup WgNAT: ", err.Error())
 	}
 	logrus.Infof("NAT enabled")
 
 	// Check NAT for wg interface
 
-	exists, err := network.IsWgNatExists(WgInfName, GwInfName, port, wgNetPrefix)
+	exists, err := wgService.IsWgNatExists(WgInfName, GwInfName, port, wgNetPrefix)
 	if err != nil {
 		logrus.Fatal("Failed to check NAT rules existanse: ", err)
 	}

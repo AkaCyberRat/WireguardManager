@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"os"
 
 	"golang.zx2c4.com/wireguard/wgctrl"
 
@@ -18,6 +19,27 @@ const (
 	WgIp    = "11.0.0.1"
 )
 
+type WgService struct {
+	client *wgctrl.Client
+	ipt    *iptables.IPTables
+}
+
+func NewWgService() (WgService, error) {
+	var empty WgService
+
+	client, err := wgctrl.New()
+	if err != nil {
+		return empty, err
+	}
+
+	ipt, err := iptables.New()
+	if err != nil {
+		return empty, err
+	}
+
+	return WgService{client: client, ipt: ipt}, nil
+}
+
 // SetupWgInterface creates and configures a wireguard interface with the given parameters.
 // - 'infName' is the name of wg interface (e.g. 'wg0')
 //
@@ -28,10 +50,16 @@ const (
 // - 'privateKey' is the private key of wg server
 //
 // - 'port' is the port number on which wg server listens (e.g. 51820)
-func SetupWgInterface(infName string, ip net.IP, mask net.IPMask, privateKey string, port int) error {
+func (s *WgService) SetupWgInterface(infName string, ip net.IP, mask net.IPMask, privateKey string, port int) error {
 	const WgLinkType = "wireguard"
 	const WgLinkMTU = 1420
 	const WgLinkTxQLen = 1000
+
+	handle, err := netlink.NewHandle()
+	if err != nil {
+		return err
+	}
+	defer handle.Close()
 
 	linkAttrs := netlink.NewLinkAttrs()
 	linkAttrs.Name = infName
@@ -42,16 +70,10 @@ func SetupWgInterface(infName string, ip net.IP, mask net.IPMask, privateKey str
 	wireguardLink.LinkType = WgLinkType
 	wireguardLink.LinkAttrs = &linkAttrs
 
-	handle, err := netlink.NewHandle()
-	if err != nil {
-		return err
-	}
-
 	if err = handle.LinkAdd(netlink.Link(wireguardLink)); err != nil {
 		return err
 	}
 
-	// Configure wg interface
 	pk, err := wgtypes.ParseKey(privateKey)
 	if err != nil {
 		return err
@@ -78,21 +100,11 @@ func SetupWgInterface(infName string, ip net.IP, mask net.IPMask, privateKey str
 		return err
 	}
 
-	client, err := wgctrl.New()
-	if err != nil {
+	if err = s.client.ConfigureDevice(infName, config); err != nil {
 		return err
 	}
 
-	if err = client.ConfigureDevice(infName, config); err != nil {
-		return err
-	}
-
-	link, err = handle.LinkByName(infName)
-	if err != nil {
-		return err
-	}
-
-	if err = netlink.LinkSetUp(link); err != nil {
+	if err = handle.LinkSetUp(link); err != nil {
 		return err
 	}
 
@@ -100,11 +112,15 @@ func SetupWgInterface(infName string, ip net.IP, mask net.IPMask, privateKey str
 }
 
 // IsWgInterfaceExists checks if a wireguard interface with the given name exists.
-func IsWgInterfaceExists(interfaceName string) bool {
-
-	_, err := netlink.LinkByName(interfaceName)
-
-	return err == nil
+func (s *WgService) IsWgInterfaceExists(interfaceName string) (bool, error) {
+	_, err := s.client.Device(interfaceName)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }
 
 // AddWgPeer adds a peer to the wireguard interface with the given parameters.
@@ -118,7 +134,7 @@ func IsWgInterfaceExists(interfaceName string) bool {
 // - 'publicKey' is the public key of peer
 //
 // - 'preSharedKey' is the pre-shared key of peer (optional)
-func AddWgPeer(wgInf string, ip net.IP, mask net.IPMask, publicKey string, preSharedKey *string) error {
+func (s *WgService) AddWgPeer(wgInf string, ip net.IP, mask net.IPMask, publicKey string, preSharedKey *string) error {
 	pubKey, err := wgtypes.ParseKey(publicKey)
 	if err != nil {
 		return err
@@ -139,12 +155,48 @@ func AddWgPeer(wgInf string, ip net.IP, mask net.IPMask, publicKey string, preSh
 		peer.PresharedKey = &preKey
 	}
 
-	client, err := wgctrl.New()
+	return s.client.ConfigureDevice(wgInf, wgtypes.Config{Peers: []wgtypes.PeerConfig{peer}})
+}
+
+// IsWgPeerExists check a peer existence for the wireguard interface with the given parameters.
+//
+// - 'wgInf' is the name of wg interface (e.g. 'wg0')
+//
+// - 'ip' is the IP address of peer (e.g. '11.0.0.2')
+//
+// - 'mask' is the subnet mask of peer (e.g. '32')
+//
+// - 'publicKey' is the public key of peer
+func (s *WgService) IsWgPeerExists(wgInf string, ip net.IP, mask net.IPMask, publicKey string) (bool, error) {
+	pubKey, err := wgtypes.ParseKey(publicKey)
 	if err != nil {
-		return err
+		return false, err
 	}
 
-	return client.ConfigureDevice(wgInf, wgtypes.Config{Peers: []wgtypes.PeerConfig{peer}})
+	device, err := s.client.Device(wgInf)
+	if err != nil {
+		return false, err
+	}
+
+	targetNet := net.IPNet{
+		IP:   ip,
+		Mask: mask,
+	}
+
+	for _, peer := range device.Peers {
+		if peer.PublicKey != pubKey {
+			continue
+		}
+
+		for _, allowed := range peer.AllowedIPs {
+			if allowed.IP.Equal(targetNet.IP) &&
+				net.IP(allowed.Mask).Equal(net.IP(targetNet.Mask)) {
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
 }
 
 // RemoveWgPeer removes a peer from the wireguard interface with the given parameters.
@@ -156,7 +208,7 @@ func AddWgPeer(wgInf string, ip net.IP, mask net.IPMask, publicKey string, preSh
 // - 'mask' is the subnet mask of peer (e.g. '32')
 //
 // - 'publicKey' is the public key of peer
-func RemoveWgPeer(wgInf string, ip net.IP, mask net.IPMask, publicKey string) error {
+func (s *WgService) RemoveWgPeer(wgInf string, ip net.IP, mask net.IPMask, publicKey string) error {
 	pubKey, err := wgtypes.ParseKey(publicKey)
 	if err != nil {
 		return err
@@ -170,15 +222,10 @@ func RemoveWgPeer(wgInf string, ip net.IP, mask net.IPMask, publicKey string) er
 		Remove:     true,
 	}
 
-	client, err := wgctrl.New()
-	if err != nil {
-		return err
-	}
-
-	return client.ConfigureDevice(wgInf, wgtypes.Config{Peers: []wgtypes.PeerConfig{peer}})
+	return s.client.ConfigureDevice(wgInf, wgtypes.Config{Peers: []wgtypes.PeerConfig{peer}})
 }
 
-// SetupWgNAT turns on iptables (legacy) NAT for packets forwarding between interfaces.
+// SetupWgNAT turns on ipt (legacy) NAT for packets forwarding between interfaces.
 //
 // - wgInf is the name of wg interface (e.g. wg0)
 //
@@ -187,21 +234,16 @@ func RemoveWgPeer(wgInf string, ip net.IP, mask net.IPMask, publicKey string) er
 // - wgPort is the port number on which wg server listens (e.g. 51820)
 //
 // - wgNet is the CIDR prefix of wg network (e.g. '11.0.0.0/24')
-func SetupWgNAT(wgInf string, gwInf string, wgPort int, wgNet netip.Prefix) error {
-	ipt, err := iptables.New()
-	if err != nil {
-		return err
-	}
-
+func (s *WgService) SetupWgNAT(wgInf string, gwInf string, wgPort int, wgNet netip.Prefix) error {
 	commands := wgNatCommands(wgInf, gwInf, wgPort, wgNet)
 
 	for _, command := range commands {
-		args, _ := shlex.Split(command)
+		args, err := shlex.Split(command)
 		if err != nil {
 			return err
 		}
 
-		if err = ipt.AppendUnique(args[1], args[3], args[4:]...); err != nil {
+		if err = s.ipt.AppendUnique(args[1], args[3], args[4:]...); err != nil {
 			return err
 		}
 	}
@@ -209,7 +251,7 @@ func SetupWgNAT(wgInf string, gwInf string, wgPort int, wgNet netip.Prefix) erro
 	return nil
 }
 
-// IsWgNatExists checks iptables (legacy) NAT rules existence.
+// IsWgNatExists checks ipt (legacy) NAT rules existence.
 //
 // - wgInf is the name of wg interface (e.g. wg0)
 //
@@ -218,12 +260,7 @@ func SetupWgNAT(wgInf string, gwInf string, wgPort int, wgNet netip.Prefix) erro
 // - wgPort is the port number on which wg server listens (e.g. 51820)
 //
 // - wgNet is the CIDR prefix of wg network (e.g. '11.0.0.0/24')
-func IsWgNatExists(wgInf string, gwInf string, wgPort int, wgNet netip.Prefix) (bool, error) {
-	ipt, err := iptables.New()
-	if err != nil {
-		return false, err
-	}
-
+func (s *WgService) IsWgNatExists(wgInf string, gwInf string, wgPort int, wgNet netip.Prefix) (bool, error) {
 	commands := wgNatCommands(wgInf, gwInf, wgPort, wgNet)
 
 	for _, command := range commands {
@@ -232,12 +269,38 @@ func IsWgNatExists(wgInf string, gwInf string, wgPort int, wgNet netip.Prefix) (
 			return false, err
 		}
 
-		if exists, err := ipt.Exists(args[1], args[3], args[4:]...); !exists || err != nil {
+		if exists, err := s.ipt.Exists(args[1], args[3], args[4:]...); !exists || err != nil {
 			return false, err
 		}
 	}
 
 	return true, nil
+}
+
+// DeleteWgNat delete ipt (legacy) NAT rules if exists.
+//
+// - wgInf is the name of wg interface (e.g. wg0)
+//
+// - gwInf is the name of gateway interface (e.g. eth0)
+//
+// - wgPort is the port number on which wg server listens (e.g. 51820)
+//
+// - wgNet is the CIDR prefix of wg network (e.g. '11.0.0.0/24')
+func (s *WgService) DeleteWgNat(wgInf string, gwInf string, wgPort int, wgNet netip.Prefix) error {
+	commands := wgNatCommands(wgInf, gwInf, wgPort, wgNet)
+
+	for _, command := range commands {
+		args, err := shlex.Split(command)
+		if err != nil {
+			return err
+		}
+
+		if err = s.ipt.DeleteIfExists(args[1], args[3], args[4:]...); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func wgNatCommands(wgInf string, gwInf string, wgPort int, wgNet netip.Prefix) []string {
