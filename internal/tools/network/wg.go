@@ -21,157 +21,6 @@ const (
 	WgIp    = "11.0.0.1"
 )
 
-func (t *Tool) wgServerUp(privateKey string) error {
-	var err error
-
-	// Create wg interface
-	if isWgExists(t.interfaceName) {
-		return errors.New("wg interface already exists")
-	}
-
-	linkAttrs := netlink.NewLinkAttrs()
-	linkAttrs.Name = t.interfaceName
-	linkAttrs.MTU = 1420
-	linkAttrs.TxQLen = 1000
-
-	wg_link := wgLink{}
-	wg_link.LinkAttrs = &linkAttrs
-	wg_link.LinkType = "wireguard"
-
-	handle, err := netlink.NewHandle()
-	if err != nil {
-		return err
-	}
-
-	if err = handle.LinkAdd(netlink.Link(wg_link)); err != nil {
-		return err
-	}
-
-	// Configure wg interface
-	pk, err := wgtypes.ParseKey(privateKey)
-	if err != nil {
-		return err
-	}
-
-	config := wgtypes.Config{
-		PrivateKey:   &pk,
-		ListenPort:   &t.port,
-		ReplacePeers: false,
-		Peers:        make([]wgtypes.PeerConfig, 0),
-	}
-
-	link, err := handle.LinkByName(t.interfaceName)
-	if err != nil {
-		return err
-	}
-
-	addr, err := netlink.ParseAddr(WgIpNet)
-	if err != nil {
-		return err
-	}
-
-	if err = handle.AddrAdd(link, addr); err != nil {
-		return err
-	}
-
-	if err = t.wgClient.ConfigureDevice(t.interfaceName, config); err != nil {
-		return err
-	}
-
-	// Up wg interface
-	nl_link, err := handle.LinkByName(t.interfaceName)
-	if err != nil {
-		return err
-	}
-
-	if err = netlink.LinkSetUp(netlink.Link(nl_link)); err != nil {
-		return err
-	}
-
-	logrus.Tracef("Wireguard interface enabled. [InterfaceName=%v, IpNet=%v, Port=%v]", t.interfaceName, WgIpNet, t.port)
-	return nil
-}
-
-func (t *Tool) wgServerDown() error {
-	linkAtrrs := netlink.NewLinkAttrs()
-	linkAtrrs.Name = t.interfaceName
-	linkAtrrs.MTU = 1420
-	linkAtrrs.TxQLen = 1000
-
-	link := wgLink{}
-	link.LinkAttrs = &linkAtrrs
-	link.LinkType = "wireguard"
-
-	if err := netlink.LinkDel(netlink.Link(link)); err != nil {
-		return err
-	}
-
-	logrus.Tracef("Wireguard interface disabled. [InterfaceName=%v, IpNet=%v, Port=%v]", t.interfaceName, WgIpNet, t.port)
-	return nil
-}
-
-func (t *Tool) wgPeerUp(ip string, publicKey string, presharedKey string) error {
-	pubKey, err := wgtypes.ParseKey(publicKey)
-	if err != nil {
-		return err
-	}
-	_, ipnet, err := net.ParseCIDR(ip + "/32")
-	if err != nil {
-		return err
-	}
-
-	ipAddresses := []net.IPNet{*ipnet}
-	// interval := time.Minute
-	peer := wgtypes.PeerConfig{
-		PublicKey:  pubKey,
-		AllowedIPs: ipAddresses,
-		// PersistentKeepaliveInterval: &interval,
-	}
-
-	if strings.TrimSpace(presharedKey) != "" {
-		preKey, err := wgtypes.ParseKey(presharedKey)
-		if err != nil {
-			return err
-		}
-		peer.PresharedKey = &preKey
-	}
-
-	peers := []wgtypes.PeerConfig{peer}
-	if err = t.wgClient.ConfigureDevice(t.interfaceName, wgtypes.Config{Peers: peers}); err != nil {
-		return err
-	}
-
-	logrus.Tracef("Wireguard peer enabled. [Ip=%v, PubKey=%v]", ip, publicKey)
-	return nil
-}
-
-func (t *Tool) wgPeerDown(ip string, publicKey string) error {
-	pubKey, err := wgtypes.ParseKey(publicKey)
-	if err != nil {
-		return err
-	}
-	_, ipnet, err := net.ParseCIDR(ip + "/32")
-	if err != nil {
-		return err
-	}
-
-	ipAddresses := []net.IPNet{*ipnet}
-
-	peer := wgtypes.PeerConfig{
-		PublicKey:  pubKey,
-		AllowedIPs: ipAddresses,
-		Remove:     true,
-	}
-
-	peers := []wgtypes.PeerConfig{peer}
-	if err = t.wgClient.ConfigureDevice(t.interfaceName, wgtypes.Config{Peers: peers}); err != nil {
-		return err
-	}
-
-	logrus.Tracef("Wireguard peer disabled. [Ip=%v, PubKey=%v]", ip, publicKey)
-	return nil
-}
-
 // SetupWgInterface creates and configures a wireguard interface with the given parameters.
 // - 'infName' is the name of wg interface (e.g. 'wg0')
 //
@@ -363,7 +212,7 @@ func SetupWgNAT(wgInf string, gwInf string, wgPort int, wgNet netip.Prefix) erro
 	return nil
 }
 
-// IsWgNatExists checks iptables (legacy) NAT rules existance.
+// IsWgNatExists checks iptables (legacy) NAT rules existence.
 //
 // - wgInf is the name of wg interface (e.g. wg0)
 //
@@ -381,7 +230,7 @@ func IsWgNatExists(wgInf string, gwInf string, wgPort int, wgNet netip.Prefix) (
 	commands := wgNatCommands(wgInf, gwInf, wgPort, wgNet)
 
 	for _, command := range commands {
-		args, _ := shlex.Split(command)
+		args, err := shlex.Split(command)
 		if err != nil {
 			return false, err
 		}
