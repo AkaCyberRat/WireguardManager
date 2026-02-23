@@ -12,6 +12,7 @@ import (
 	"WireguardManager/internal/config"
 	"WireguardManager/internal/logging"
 	"WireguardManager/internal/tools/network"
+
 	"github.com/sirupsen/logrus"
 )
 
@@ -79,6 +80,14 @@ func main() {
 		logrus.Fatal("Failed to setup WgNAT: ", err.Error())
 	}
 	logrus.Infof("NAT enabled")
+
+	// Check NAT for wg interface
+
+	exists, err := network.IsWgNatExists(WgInfName, GwInfName, port, wgNetPrefix)
+	if err != nil {
+		logrus.Fatal("Failed to check NAT rules existanse: ", err)
+	}
+	logrus.Infof("Is NAT exists: ", exists)
 
 	wgPeerMask := net.CIDRMask(WgPeerMask, 32)
 	peerPublicKey := conf.PeerPublicKey

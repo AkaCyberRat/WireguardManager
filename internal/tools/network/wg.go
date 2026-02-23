@@ -342,25 +342,14 @@ func RemoveWgPeer(wgInf string, ip net.IP, mask net.IPMask, publicKey string) er
 //
 // - wgNet is the CIDR prefix of wg network (e.g. '11.0.0.0/24')
 func SetupWgNAT(wgInf string, gwInf string, wgPort int, wgNet netip.Prefix) error {
-
 	ipt, err := iptables.New()
 	if err != nil {
 		return err
 	}
 
-	iptables_commands := []string{
-		// NAT for wg interface
-		fmt.Sprintf("-t nat -A POSTROUTING -s %v -o %v -j MASQUERADE", wgNet, gwInf),
-		fmt.Sprintf("-t filter -A INPUT -p udp -m udp --dport %v -j ACCEPT", wgPort),
-		fmt.Sprintf("-t filter -A FORWARD -i %v -j ACCEPT", wgInf),
-		fmt.Sprintf("-t filter -A FORWARD -o %v -j ACCEPT", wgInf),
+	commands := wgNatCommands(wgInf, gwInf, wgPort, wgNet)
 
-		// DNS redirect
-		fmt.Sprintf("-t nat -A PREROUTING -i %v -p udp --dport 53 -j DNAT --to-destination 8.8.8.8:53", wgInf),
-		fmt.Sprintf("-t nat -A PREROUTING -i %v -p tcp --dport 53 -j DNAT --to-destination 8.8.8.8:53", wgInf),
-	}
-
-	for _, command := range iptables_commands {
+	for _, command := range commands {
 		args, _ := shlex.Split(command)
 		if err != nil {
 			return err
@@ -372,6 +361,51 @@ func SetupWgNAT(wgInf string, gwInf string, wgPort int, wgNet netip.Prefix) erro
 	}
 
 	return nil
+}
+
+// IsWgNatExists checks iptables (legacy) NAT rules existance.
+//
+// - wgInf is the name of wg interface (e.g. wg0)
+//
+// - gwInf is the name of gateway interface (e.g. eth0)
+//
+// - wgPort is the port number on which wg server listens (e.g. 51820)
+//
+// - wgNet is the CIDR prefix of wg network (e.g. '11.0.0.0/24')
+func IsWgNatExists(wgInf string, gwInf string, wgPort int, wgNet netip.Prefix) (bool, error) {
+	ipt, err := iptables.New()
+	if err != nil {
+		return false, err
+	}
+
+	commands := wgNatCommands(wgInf, gwInf, wgPort, wgNet)
+
+	for _, command := range commands {
+		args, _ := shlex.Split(command)
+		if err != nil {
+			return false, err
+		}
+
+		if exists, err := ipt.Exists(args[1], args[3], args[4:]...); !exists || err != nil {
+			return false, err
+		}
+	}
+
+	return true, nil
+}
+
+func wgNatCommands(wgInf string, gwInf string, wgPort int, wgNet netip.Prefix) []string {
+	return []string{
+		// NAT for wg interface
+		fmt.Sprintf("-t nat -A POSTROUTING -s %v -o %v -j MASQUERADE", wgNet, gwInf),
+		fmt.Sprintf("-t filter -A INPUT -p udp -m udp --dport %v -j ACCEPT", wgPort),
+		fmt.Sprintf("-t filter -A FORWARD -i %v -j ACCEPT", wgInf),
+		fmt.Sprintf("-t filter -A FORWARD -o %v -j ACCEPT", wgInf),
+
+		// DNS redirect
+		fmt.Sprintf("-t nat -A PREROUTING -i %v -p udp --dport 53 -j DNAT --to-destination 8.8.8.8:53", wgInf),
+		fmt.Sprintf("-t nat -A PREROUTING -i %v -p tcp --dport 53 -j DNAT --to-destination 8.8.8.8:53", wgInf),
+	}
 }
 
 //
