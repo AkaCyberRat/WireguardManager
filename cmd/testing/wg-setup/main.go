@@ -86,7 +86,7 @@ func main() {
 	if err != nil {
 		logrus.Fatal("Failed to check NAT rules existanse: ", err)
 	}
-	logrus.Infof("Is NAT exists: ", exists)
+	logrus.Infof("Is NAT exists: %v", exists)
 
 	// Wait for exit signal
 	waitForExitSignal()

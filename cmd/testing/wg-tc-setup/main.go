@@ -87,7 +87,7 @@ func main() {
 	if err != nil {
 		logrus.Fatal("Failed to check NAT rules existanse: ", err)
 	}
-	logrus.Infof("Is NAT exists: ", exists)
+	logrus.Infof("Is NAT exists: %v", exists)
 
 	wgPeerMask := net.CIDRMask(WgPeerMask, 32)
 	peerPublicKey := conf.PeerPublicKey

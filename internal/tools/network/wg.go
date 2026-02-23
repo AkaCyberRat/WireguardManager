@@ -1,17 +1,14 @@
 package network
 
 import (
-	"errors"
 	"fmt"
 	"net"
 	"net/netip"
-	"strings"
 
 	"golang.zx2c4.com/wireguard/wgctrl"
 
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/google/shlex"
-	"github.com/sirupsen/logrus"
 	"github.com/vishvananda/netlink"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
