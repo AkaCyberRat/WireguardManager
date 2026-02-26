@@ -1,14 +1,13 @@
 package network
 
 import (
+	"WireguardManager/pkg/shell"
+	"errors"
 	"fmt"
 	"github.com/vishvananda/netlink"
 	"net"
 	"strconv"
 	"strings"
-	"time"
-
-	"WireguardManager/pkg/shell"
 
 	"github.com/sirupsen/logrus"
 )
@@ -16,6 +15,10 @@ import (
 func SetupTcBase(wgInf string) error {
 	const ifbInf = "ifb0"
 	const rootRate = "100gbit"
+
+	//
+	// 		Add base rule(s) to limit server egress (client download bandwidth)
+	//
 
 	// Create root HTB qdisc for wg interface
 	// tc qdisc add dev wgInf root handle 1: htb
@@ -36,26 +39,45 @@ func SetupTcBase(wgInf string) error {
 	})
 
 	if err := netlink.QdiscAdd(qdisc); err != nil {
-		fmt.Println("QdiscAdd error:", err)
-		time.Sleep(time.Minute * 10)
+		return err
+	}
+
+	//
+	// 		Add base rule(s) to limit server ingress (client upload bandwidth)
+	//
+
+	// Create and up IFB interface
+	// "ip link add ifbInf type ifb"
+	// "ip link set ifbInf up"
+
+	ifb := &netlink.Ifb{
+		LinkAttrs: netlink.LinkAttrs{
+			Name: ifbInf,
+		},
+	}
+
+	if err := netlink.LinkAdd(ifb); err != nil {
+		return err
+	}
+
+	link, err = netlink.LinkByName(ifbInf)
+	if err != nil {
+		return err
+	}
+
+	if err := netlink.LinkSetUp(link); err != nil {
 		return err
 	}
 
 	commands := []string{
-		//
-		// 		Add base rule(s) to limit server egress (client download bandwidth)
-		//
-
-		//// Create root HTB qdisc for wg interface
-		//fmt.Sprintf("tc qdisc add dev %s root handle 1: htb", wgInf),
 
 		//
 		// 		Add base rule(s) to limit server ingress (client upload bandwidth)
 		//
 
 		// Create and up IFB interface
-		fmt.Sprintf("ip link add %s type ifb", ifbInf),
-		fmt.Sprintf("ip link set %s up", ifbInf),
+		//fmt.Sprintf("ip link add %s type ifb", ifbInf),
+		//fmt.Sprintf("ip link set %s up", ifbInf),
 
 		// Create ingress qdisc and filter on wg interface and redirect all ingress traffic to IFB interface
 		fmt.Sprintf("tc qdisc add dev %s handle ffff: ingress", wgInf),
@@ -75,6 +97,44 @@ func SetupTcBase(wgInf string) error {
 	}
 
 	logrus.Tracef("Traffic control rules for server enabled.")
+	return nil
+}
+
+func CheckTcBase(wgInf string) error {
+	const ifbInf = "ifb0"
+
+	//	Check creation of root HTB qdisc for wg interface
+	link, err := netlink.LinkByName(wgInf)
+	if err != nil {
+		return err
+	}
+
+	qdiscs, err := netlink.QdiscList(link)
+	if err != nil {
+		return err
+	}
+
+	for _, q := range qdiscs {
+		if _, ok := q.(*netlink.Htb); !ok {
+			return errors.New("Qdisc is not a Htb")
+		}
+	}
+
+	// Check creation of IFB interface
+	link, err = netlink.LinkByName(ifbInf)
+	if err != nil {
+		if _, ok := err.(netlink.LinkNotFoundError); ok {
+			return errors.New("IFB interface doesnt exist:" + err.Error())
+		}
+
+		return errors.New("Failed to check IFB interface existence:" + err.Error())
+	}
+
+	// Check if IFB interface is up
+	if link.Attrs().Flags&net.FlagUp == 0 {
+		return errors.New("IFB interface is not up")
+	}
+
 	return nil
 }
 
