@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/vishvananda/netlink"
+	"golang.org/x/sys/unix"
 	"net"
 	"strconv"
 	"strings"
@@ -32,13 +33,13 @@ func SetupTcBase(wgInf string) error {
 		return err
 	}
 
-	qdisc := netlink.NewHtb(netlink.QdiscAttrs{
+	htbQdisc := netlink.NewHtb(netlink.QdiscAttrs{
 		LinkIndex: link.Attrs().Index,
 		Handle:    netlink.MakeHandle(1, 0),
 		Parent:    netlink.HANDLE_ROOT,
 	})
 
-	if err := netlink.QdiscAdd(qdisc); err != nil {
+	if err := netlink.QdiscAdd(htbQdisc); err != nil {
 		return err
 	}
 
@@ -69,20 +70,60 @@ func SetupTcBase(wgInf string) error {
 		return err
 	}
 
+	// Create ingress qdisc and filter on wg interface and redirect all ingress traffic to IFB interface
+	// "tc qdisc add dev wgInf handle ffff: ingress"
+	// "tc filter add dev wgInf parent ffff: protocol ip u32 match ip src 0.0.0.0/0 action mirred egress redirect dev ifbInf"
+
+	link, err = netlink.LinkByName(wgInf)
+	if err != nil {
+		return err
+	}
+
+	ingressQdisc := &netlink.Ingress{
+		QdiscAttrs: netlink.QdiscAttrs{
+			LinkIndex: link.Attrs().Index,
+			Handle:    netlink.MakeHandle(0xffff, 0),
+			Parent:    netlink.HANDLE_INGRESS,
+		},
+	}
+
+	if err = netlink.QdiscAdd(ingressQdisc); err != nil {
+		return err
+	}
+
+	wgInfLink, err := netlink.LinkByName(wgInf)
+	if err != nil {
+		return err
+	}
+
+	ifbInfLink, err := netlink.LinkByName(ifbInf)
+	if err != nil {
+		return err
+	}
+
+	filter := &netlink.U32{
+		FilterAttrs: netlink.FilterAttrs{
+			LinkIndex: wgInfLink.Attrs().Index,
+			Parent:    netlink.MakeHandle(0xffff, 0),
+			Protocol:  unix.ETH_P_IP,
+			Priority:  1,
+		},
+		Actions: []netlink.Action{
+			&netlink.MirredAction{
+				ActionAttrs: netlink.ActionAttrs{
+					Action: netlink.TC_ACT_STOLEN,
+				},
+				MirredAction: netlink.TCA_EGRESS_REDIR,
+				Ifindex:      ifbInfLink.Attrs().Index,
+			},
+		},
+	}
+
+	if err = netlink.FilterAdd(filter); err != nil {
+		return err
+	}
+
 	commands := []string{
-
-		//
-		// 		Add base rule(s) to limit server ingress (client upload bandwidth)
-		//
-
-		// Create and up IFB interface
-		//fmt.Sprintf("ip link add %s type ifb", ifbInf),
-		//fmt.Sprintf("ip link set %s up", ifbInf),
-
-		// Create ingress qdisc and filter on wg interface and redirect all ingress traffic to IFB interface
-		fmt.Sprintf("tc qdisc add dev %s handle ffff: ingress", wgInf),
-		fmt.Sprintf("tc filter add dev %s parent ffff: protocol ip u32 match ip src 0.0.0.0/0 action mirred egress redirect dev %s", wgInf, ifbInf),
-
 		// Create root HTB qdisc for IFB interface to shape ingress traffic
 		fmt.Sprintf("tc qdisc add dev %s root handle 1: htb default 999", ifbInf),
 
@@ -133,6 +174,33 @@ func CheckTcBase(wgInf string) error {
 	// Check if IFB interface is up
 	if link.Attrs().Flags&net.FlagUp == 0 {
 		return errors.New("IFB interface is not up")
+	}
+
+	// Check creation of ingress qdisc and filter on wg interface and redirect all ingress traffic to IFB interface
+
+	link, err = netlink.LinkByName(wgInf)
+	if err != nil {
+		return err
+	}
+
+	qdiscs, err = netlink.QdiscList(link)
+	if err != nil {
+		return err
+	}
+
+	for _, q := range qdiscs {
+		if _, ok := q.(*netlink.Ingress); !ok {
+			return errors.New("qdisc is not a Ingress qdisc")
+		}
+	}
+
+	filters, err := netlink.FilterList(link, netlink.MakeHandle(0xffff, 0))
+	if err != nil {
+		return err
+	}
+
+	if len(filters) == 0 {
+		return errors.New("no redirect filters found on wg interface")
 	}
 
 	return nil
