@@ -2,9 +2,11 @@ package network
 
 import (
 	"fmt"
+	"github.com/vishvananda/netlink"
 	"net"
 	"strconv"
 	"strings"
+	"time"
 
 	"WireguardManager/pkg/shell"
 
@@ -15,13 +17,37 @@ func SetupTcBase(wgInf string) error {
 	const ifbInf = "ifb0"
 	const rootRate = "100gbit"
 
+	// Create root HTB qdisc for wg interface
+	// tc qdisc add dev wgInf root handle 1: htb
+	link, err := netlink.LinkByName(wgInf)
+	if err != nil {
+		fmt.Println("LinkByName error:", err)
+		return err
+	}
+
+	if err := netlink.LinkSetUp(link); err != nil {
+		return err
+	}
+
+	qdisc := netlink.NewHtb(netlink.QdiscAttrs{
+		LinkIndex: link.Attrs().Index,
+		Handle:    netlink.MakeHandle(1, 0),
+		Parent:    netlink.HANDLE_ROOT,
+	})
+
+	if err := netlink.QdiscAdd(qdisc); err != nil {
+		fmt.Println("QdiscAdd error:", err)
+		time.Sleep(time.Minute * 10)
+		return err
+	}
+
 	commands := []string{
 		//
 		// 		Add base rule(s) to limit server egress (client download bandwidth)
 		//
 
-		// Create root HTB qdisc for wg interface
-		fmt.Sprintf("tc qdisc add dev %s root handle 1: htb", wgInf),
+		//// Create root HTB qdisc for wg interface
+		//fmt.Sprintf("tc qdisc add dev %s root handle 1: htb", wgInf),
 
 		//
 		// 		Add base rule(s) to limit server ingress (client upload bandwidth)
