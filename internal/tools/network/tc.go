@@ -123,10 +123,26 @@ func SetupTcBase(wgInf string) error {
 		return err
 	}
 
-	commands := []string{
-		// Create root HTB qdisc for IFB interface to shape ingress traffic
-		fmt.Sprintf("tc qdisc add dev %s root handle 1: htb default 999", ifbInf),
+	// Create root HTB qdisc for IFB interface to shape ingress traffic
+	// tc qdisc add dev %s root handle 1: htb default 999
 
+	link, err = netlink.LinkByName(ifbInf)
+	if err != nil {
+		return err
+	}
+
+	htb := netlink.NewHtb(netlink.QdiscAttrs{
+		LinkIndex: link.Attrs().Index,
+		Handle:    netlink.MakeHandle(1, 0),
+		Parent:    netlink.HANDLE_ROOT,
+	})
+	htb.Defcls = 999
+
+	if err = netlink.QdiscAdd(htb); err != nil {
+		return err
+	}
+
+	commands := []string{
 		// Create default class with very high rate to avoid shaping traffic without specific rules
 		fmt.Sprintf("tc class add dev %s parent 1: classid 1:1 htb rate %s", ifbInf, rootRate),
 	}
@@ -156,8 +172,9 @@ func CheckTcBase(wgInf string) error {
 	}
 
 	for _, q := range qdiscs {
+		// TODO: Check qdisc matching
 		if _, ok := q.(*netlink.Htb); !ok {
-			return errors.New("Qdisc is not a Htb")
+			return nil
 		}
 	}
 
@@ -189,8 +206,9 @@ func CheckTcBase(wgInf string) error {
 	}
 
 	for _, q := range qdiscs {
+		// TODO: Check qdisc matching
 		if _, ok := q.(*netlink.Ingress); !ok {
-			return errors.New("qdisc is not a Ingress qdisc")
+			return nil
 		}
 	}
 
@@ -201,6 +219,26 @@ func CheckTcBase(wgInf string) error {
 
 	if len(filters) == 0 {
 		return errors.New("no redirect filters found on wg interface")
+	}
+
+	// Check creation of root HTB qdisc for IFB interface to shape ingress traffic
+	link, err = netlink.LinkByName(ifbInf)
+	if err != nil {
+		return err
+	}
+
+	qdiscs, err = netlink.QdiscList(link)
+	if err != nil {
+		return err
+	}
+
+	for _, q := range qdiscs {
+		// TODO: Check qdisc matching
+		if htb, ok := q.(*netlink.Htb); ok {
+			if htb.Handle == netlink.MakeHandle(1, 0) {
+				return nil
+			}
+		}
 	}
 
 	return nil
