@@ -71,11 +71,18 @@ func main() {
 	}
 	logrus.Infof("Server enabled")
 
-	// Setup TC base
+	// Setup TC base rules
 	if err := network.SetupTcBase(WgInfName); err != nil {
 		logrus.Fatal("Failed to setup tc base: ", err.Error())
 	}
 	logrus.Infof("Tc base enabled")
+
+	// Check TC base rules
+	if err := network.CheckTcBase(WgInfName); err != nil {
+		logrus.Fatal("Failed to check tc base rules existence: ", err)
+	} else {
+		logrus.Infof("Tc base rules exist")
+	}
 
 	// Setup NAT for wg interface
 

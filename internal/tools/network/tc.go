@@ -4,13 +4,10 @@ import (
 	"WireguardManager/pkg/shell"
 	"errors"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 	"net"
-	"strconv"
-	"strings"
-
-	"github.com/sirupsen/logrus"
 )
 
 func SetupTcBase(wgInf string) error {
@@ -127,7 +124,7 @@ func SetupTcBase(wgInf string) error {
 	}
 
 	htbClass := netlink.NewHtbClass(classAttrs, netlink.HtbClassAttrs{
-		Rate: 100 * 1000 * 1000 * 1000 / 8, // в bytes per second! - 100gbit
+		Rate: 100 * 1000 * 1000 * 1000 / 8, // bytes per second! - 100gbit
 	})
 
 	if err = netlink.ClassAdd(htbClass); err != nil {
@@ -141,88 +138,46 @@ func SetupTcBase(wgInf string) error {
 func CheckTcBase(wgInf string) error {
 	const ifbInf = "ifb0"
 
-	//	Check creation of root HTB qdisc for wg interface
-	wgInfLink, err := netlink.LinkByName(wgInf)
+	// Check creation of WG interface
+	wgInfLink, err := tryLink(wgInf)
 	if err != nil {
 		return err
 	}
 
-	qdiscs, err := netlink.QdiscList(wgInfLink)
+	//	Check root HTB qdisc for wg interface
+	if err = hasQdisc(wgInfLink, netlink.MakeHandle(1, 0), netlink.HANDLE_ROOT); err != nil {
+		return fmt.Errorf("wg root htb qdisc check failed: %s", err)
+	}
+
+	// Check IFB interface
+	ifbInfLink, err := tryLink(ifbInf)
 	if err != nil {
 		return err
 	}
 
-	for _, q := range qdiscs {
-		// TODO: Check qdisc matching
-		if _, ok := q.(*netlink.Htb); !ok {
-			return nil
-		}
-	}
-
-	// Check creation of IFB interface
-
-	ifbInfLink, err := netlink.LinkByName(ifbInf)
-	if err != nil {
-		if _, ok := err.(netlink.LinkNotFoundError); ok {
-			return errors.New("IFB interface doesnt exist:" + err.Error())
-		}
-
-		return errors.New("Failed to check IFB interface existence:" + err.Error())
-	}
-
-	// Check if IFB interface is up
+	// Check IFB interface up
 	if ifbInfLink.Attrs().Flags&net.FlagUp == 0 {
 		return errors.New("IFB interface is not up")
 	}
 
-	// Check creation of ingress qdisc and filter on wg interface and redirect all ingress traffic to IFB interface
-	qdiscs, err = netlink.QdiscList(wgInfLink)
-	if err != nil {
-		return err
+	// Check ingress qdisc on wg interface
+	if err = hasQdisc(wgInfLink, netlink.MakeHandle(0xffff, 0), netlink.HANDLE_INGRESS); err != nil {
+		return fmt.Errorf("wg ingress qdisc check failed: %s", err)
 	}
 
-	for _, q := range qdiscs {
-		// TODO: Check qdisc matching
-		if _, ok := q.(*netlink.Ingress); !ok {
-			return nil
-		}
-	}
-
-	filters, err := netlink.FilterList(wgInfLink, netlink.MakeHandle(0xffff, 0))
-	if err != nil {
-		return err
-	}
-
-	if len(filters) == 0 {
-		return errors.New("no redirect filters found on wg interface")
+	// Check creation of filter on wg interface and redirect all ingress traffic to IFB interface
+	if err = hasU32EgressRedirectFilter(wgInfLink, netlink.MakeHandle(0xffff, 0)); err != nil {
+		return fmt.Errorf("wg ingress redirect filter check failed: %s", err)
 	}
 
 	// Check creation of root HTB qdisc for IFB interface to shape ingress traffic
-	qdiscs, err = netlink.QdiscList(ifbInfLink)
-	if err != nil {
-		return err
-	}
-
-	for _, q := range qdiscs {
-		// TODO: Check qdisc matching
-		if htb, ok := q.(*netlink.Htb); ok {
-			if htb.Handle == netlink.MakeHandle(1, 0) {
-				return nil
-			}
-		}
+	if err = hasQdisc(ifbInfLink, netlink.MakeHandle(1, 0), netlink.HANDLE_ROOT); err != nil {
+		return fmt.Errorf("ifb root htb qdisc check failed: %s", err)
 	}
 
 	// Check creation of default class with very high rate to avoid shaping traffic without specific rules
-	classes, err := netlink.ClassList(ifbInfLink, netlink.MakeHandle(1, 0))
-	if err != nil {
-		return err
-	}
-
-	for _, c := range classes {
-		// TODO: Check class matching
-		if c.Attrs().Handle == netlink.MakeHandle(1, 1) {
-			return nil
-		}
+	if err = hasClass(ifbInfLink, netlink.MakeHandle(1, 1), netlink.MakeHandle(1, 0)); err != nil {
+		return fmt.Errorf("ifb default htb class check failed: %s", err)
 	}
 
 	return nil
@@ -317,6 +272,67 @@ func DiscardTcForPeer(wgInf string, peerIp net.IP, serverNetworkMask net.IPMask)
 	return nil
 }
 
+func tryLink(name string) (netlink.Link, error) {
+	link, err := netlink.LinkByName(name)
+	if err != nil {
+		if errors.As(err, new(netlink.LinkNotFoundError)) {
+			return nil, fmt.Errorf("%s interface doesn't exist: %w", name, err)
+		}
+		return nil, fmt.Errorf("failed to check %s interface: %w", name, err)
+	}
+	return link, nil
+}
+
+func hasQdisc(link netlink.Link, handle, parent uint32) error {
+	qdiscs, err := netlink.QdiscList(link)
+	if err != nil {
+		return err
+	}
+
+	for _, q := range qdiscs {
+		attrs := q.Attrs()
+		if attrs.Handle == handle && attrs.Parent == parent {
+			return nil
+		}
+	}
+	return fmt.Errorf("qdisc not found ( Interface: '%s', Handle: '%v', Parent: '%v' )", link.Attrs().Name, handle, parent)
+}
+
+func hasClass(link netlink.Link, handle, parent uint32) error {
+	classes, err := netlink.ClassList(link, parent)
+	if err != nil {
+		return err
+	}
+
+	for _, c := range classes {
+		if c.Attrs().Handle == handle {
+			return nil
+		}
+	}
+	return fmt.Errorf("class not found ( Interface: '%s', Handle: '%v', Parent: '%v' )", link.Attrs().Name, handle, parent)
+}
+
+func hasU32EgressRedirectFilter(link netlink.Link, parent uint32) error {
+	filters, err := netlink.FilterList(link, parent)
+	if err != nil {
+		return err
+	}
+
+	for _, filter := range filters {
+		if filter, ok := filter.(*netlink.U32); ok {
+			for _, act := range filter.Actions {
+				if mirred, ok := act.(*netlink.MirredAction); ok {
+					if mirred.MirredAction == netlink.TCA_EGRESS_REDIR &&
+						mirred.Action == netlink.TC_ACT_STOLEN {
+						return nil
+					}
+				}
+			}
+		}
+	}
+	return fmt.Errorf("redirect filter not found ( Interface: '%s', Parent: '%v' )", link.Attrs().Name, parent)
+}
+
 func hostNumber(ip net.IP, mask net.IPMask) uint32 {
 	ip4 := ip.To4()
 	if ip4 == nil {
@@ -330,22 +346,4 @@ func hostNumber(ip net.IP, mask net.IPMask) uint32 {
 
 	// host number = ip & ^mask
 	return ipUint & ^maskUint
-}
-
-//modprobe ifb
-//ip link add ifb0 type ifb
-//ip link set ifb0 up
-//
-//tc qdisc add dev wg0 handle ffff: ingress
-//tc filter add dev wg0 parent ffff: protocol ip u32 match ip src PEER_IP action mirred egress redirect dev ifb0
-//
-//tc qdisc add dev ifb0 root handle 1: htb
-//tc class add dev ifb0 parent 1: classid 1:1 htb rate 100mbit ceil 100mbit
-
-func getIpIndex(ip string) int {
-	octs := strings.Split(ip, ".")
-	oct3, _ := strconv.Atoi(octs[2])
-	oct4, _ := strconv.Atoi(octs[3])
-
-	return (oct3 << 8) | oct4
 }

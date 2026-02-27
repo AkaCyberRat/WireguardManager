@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/vishvananda/netlink"
 	"net"
+	"strconv"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -369,4 +370,12 @@ func (t *Tool) tcPeerDown(ip string) error {
 
 	logrus.Tracef("Traffic control rules for peer disabled. [Ip=%v]", ip)
 	return nil
+}
+
+func getIpIndex(ip string) int {
+	octs := strings.Split(ip, ".")
+	oct3, _ := strconv.Atoi(octs[2])
+	oct4, _ := strconv.Atoi(octs[3])
+
+	return (oct3 << 8) | oct4
 }
