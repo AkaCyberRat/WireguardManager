@@ -87,11 +87,10 @@ func main() {
 
 	// Check NAT for wg interface
 
-	exists, err := wgService.IsWgNatExists(WgInfName, GwInfName, port, wgNetPrefix)
-	if err != nil {
-		logrus.Fatal("Failed to check NAT rules existanse: ", err)
+	if err := wgService.CheckWgNat(WgInfName, GwInfName, port, wgNetPrefix); err != nil {
+		logrus.Fatal("Failed to check NAT rules existence: ", err)
 	}
-	logrus.Infof("Is NAT exists: %v", exists)
+	logrus.Info("wg nat exists")
 
 	// Wait for exit signal
 	waitForExitSignal()

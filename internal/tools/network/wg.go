@@ -2,11 +2,9 @@ package network
 
 import (
 	"fmt"
+	"golang.zx2c4.com/wireguard/wgctrl"
 	"net"
 	"net/netip"
-	"os"
-
-	"golang.zx2c4.com/wireguard/wgctrl"
 
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/google/shlex"
@@ -111,16 +109,10 @@ func (s *WgService) SetupWgInterface(infName string, ip net.IP, mask net.IPMask,
 	return nil
 }
 
-// IsWgInterfaceExists checks if a wireguard interface with the given name exists.
-func (s *WgService) IsWgInterfaceExists(interfaceName string) (bool, error) {
+// CheckWgInterface checks if a wireguard interface with the given name exists.
+func (s *WgService) CheckWgInterface(interfaceName string) error {
 	_, err := s.client.Device(interfaceName)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return false, nil
-		}
-		return false, err
-	}
-	return true, nil
+	return err
 }
 
 // AddWgPeer adds a peer to the wireguard interface with the given parameters.
@@ -251,7 +243,7 @@ func (s *WgService) SetupWgNAT(wgInf string, gwInf string, wgPort int, wgNet net
 	return nil
 }
 
-// IsWgNatExists checks ipt (legacy) NAT rules existence.
+// CheckWgNat checks ipt (legacy) NAT rules existence.
 //
 // - wgInf is the name of wg interface (e.g. wg0)
 //
@@ -260,21 +252,26 @@ func (s *WgService) SetupWgNAT(wgInf string, gwInf string, wgPort int, wgNet net
 // - wgPort is the port number on which wg server listens (e.g. 51820)
 //
 // - wgNet is the CIDR prefix of wg network (e.g. '11.0.0.0/24')
-func (s *WgService) IsWgNatExists(wgInf string, gwInf string, wgPort int, wgNet netip.Prefix) (bool, error) {
+func (s *WgService) CheckWgNat(wgInf string, gwInf string, wgPort int, wgNet netip.Prefix) error {
 	commands := wgNatCommands(wgInf, gwInf, wgPort, wgNet)
 
 	for _, command := range commands {
 		args, err := shlex.Split(command)
 		if err != nil {
-			return false, err
+			return err
 		}
 
-		if exists, err := s.ipt.Exists(args[1], args[3], args[4:]...); !exists || err != nil {
-			return false, err
+		exists, err := s.ipt.Exists(args[1], args[3], args[4:]...)
+		if err != nil {
+			return err
+		}
+
+		if !exists {
+			return fmt.Errorf("NAT rule does not exist: %v", command)
 		}
 	}
 
-	return true, nil
+	return nil
 }
 
 // DeleteWgNat delete ipt (legacy) NAT rules if exists.

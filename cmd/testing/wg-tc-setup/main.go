@@ -1,13 +1,16 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
+	"log"
 	"net"
 	"net/netip"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"WireguardManager/internal/config"
 	"WireguardManager/internal/logging"
@@ -37,10 +40,15 @@ func (c Configuration) Validate() error {
 	return nil
 }
 
+const (
+	GwInfName    = "eth0"
+	WgInfName    = "wg0"
+	WgServerIp   = "11.0.0.1"
+	WgServerMask = 24
+	WgPeerMask   = 32
+)
+
 func main() {
-	const GwInfName, WgInfName = "eth0", "wg0"
-	const WgServerIp, WgServerMask = "11.0.0.1", 24
-	const WgPeerMask = 32
 
 	logging.SetTempConfiguration()
 
@@ -95,11 +103,10 @@ func main() {
 
 	// Check NAT for wg interface
 
-	exists, err := wgService.IsWgNatExists(WgInfName, GwInfName, port, wgNetPrefix)
-	if err != nil {
-		logrus.Fatal("Failed to check NAT rules existanse: ", err)
+	if err := wgService.CheckWgNat(WgInfName, GwInfName, port, wgNetPrefix); err != nil {
+		logrus.Fatal("Failed to check NAT rules existence: ", err)
 	}
-	logrus.Infof("Is NAT exists: %v", exists)
+	logrus.Infof("Wg nat exists")
 
 	wgPeerMask := net.CIDRMask(WgPeerMask, 32)
 	peerPublicKey := conf.PeerPublicKey
@@ -123,11 +130,54 @@ func main() {
 
 	}
 
+	go StartTimedValidator(context.Background(), 30*time.Second, wgService, conf)
+
 	// Wait for exit  signal
 	waitForExitSignal()
 
 	logrus.Info("Shutting down")
 
+}
+
+func StartTimedValidator(ctx context.Context, interval time.Duration, wgService network.WgService, config Configuration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			startTime := time.Now()
+			err := ValidateOnce(wgService, config)
+			duration := time.Since(startTime)
+
+			if err != nil {
+				logrus.Errorf("Timed validation failed (%v): %s", duration, err.Error())
+			} else {
+				logrus.Infof("Timed validation completed (%v)", duration)
+			}
+		case <-ctx.Done():
+			log.Println("Timed validator stopped")
+			return
+		}
+	}
+}
+
+func ValidateOnce(wgService network.WgService, config Configuration) error {
+	wgNetPrefix := netip.MustParsePrefix(fmt.Sprintf("%s/%d", WgServerIp, WgServerMask))
+
+	if err := wgService.CheckWgInterface(WgInfName); err != nil {
+		return fmt.Errorf("wg interface check failed: %w", err)
+	}
+
+	if err := wgService.CheckWgNat(WgInfName, GwInfName, config.ServerPort, wgNetPrefix); err != nil {
+		return fmt.Errorf("wg nat check failed: %w", err)
+	}
+
+	if err := network.CheckTcBase(WgInfName); err != nil {
+		return fmt.Errorf("tc validation failed: %w", err)
+	}
+
+	return nil
 }
 
 func waitForExitSignal() {
