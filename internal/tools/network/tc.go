@@ -15,26 +15,25 @@ import (
 
 func SetupTcBase(wgInf string) error {
 	const ifbInf = "ifb0"
-	const rootRate = "100gbit"
 
 	//
 	// 		Add base rule(s) to limit server egress (client download bandwidth)
 	//
 
 	// Create root HTB qdisc for wg interface
-	// tc qdisc add dev wgInf root handle 1: htb
-	link, err := netlink.LinkByName(wgInf)
+	// Command analog: 'tc qdisc add dev wgInf root handle 1: htb'
+	wgInfLink, err := netlink.LinkByName(wgInf)
 	if err != nil {
 		fmt.Println("LinkByName error:", err)
 		return err
 	}
 
-	if err := netlink.LinkSetUp(link); err != nil {
+	if err := netlink.LinkSetUp(wgInfLink); err != nil {
 		return err
 	}
 
 	htbQdisc := netlink.NewHtb(netlink.QdiscAttrs{
-		LinkIndex: link.Attrs().Index,
+		LinkIndex: wgInfLink.Attrs().Index,
 		Handle:    netlink.MakeHandle(1, 0),
 		Parent:    netlink.HANDLE_ROOT,
 	})
@@ -48,9 +47,7 @@ func SetupTcBase(wgInf string) error {
 	//
 
 	// Create and up IFB interface
-	// "ip link add ifbInf type ifb"
-	// "ip link set ifbInf up"
-
+	// Command analog: 'ip link add ifbInf type ifb'
 	ifb := &netlink.Ifb{
 		LinkAttrs: netlink.LinkAttrs{
 			Name: ifbInf,
@@ -61,27 +58,21 @@ func SetupTcBase(wgInf string) error {
 		return err
 	}
 
-	link, err = netlink.LinkByName(ifbInf)
+	// Command analog: 'ip link set ifbInf up'
+	ifbInfLink, err := netlink.LinkByName(ifbInf)
 	if err != nil {
 		return err
 	}
 
-	if err := netlink.LinkSetUp(link); err != nil {
+	if err := netlink.LinkSetUp(ifbInfLink); err != nil {
 		return err
 	}
 
 	// Create ingress qdisc and filter on wg interface and redirect all ingress traffic to IFB interface
-	// "tc qdisc add dev wgInf handle ffff: ingress"
-	// "tc filter add dev wgInf parent ffff: protocol ip u32 match ip src 0.0.0.0/0 action mirred egress redirect dev ifbInf"
-
-	link, err = netlink.LinkByName(wgInf)
-	if err != nil {
-		return err
-	}
-
+	// Command analog: 'tc filter add dev wgInf parent ffff: protocol ip u32 match ip src 0.0.0.0/0 action mirred egress redirect dev ifbInf'
 	ingressQdisc := &netlink.Ingress{
 		QdiscAttrs: netlink.QdiscAttrs{
-			LinkIndex: link.Attrs().Index,
+			LinkIndex: wgInfLink.Attrs().Index,
 			Handle:    netlink.MakeHandle(0xffff, 0),
 			Parent:    netlink.HANDLE_INGRESS,
 		},
@@ -91,16 +82,7 @@ func SetupTcBase(wgInf string) error {
 		return err
 	}
 
-	wgInfLink, err := netlink.LinkByName(wgInf)
-	if err != nil {
-		return err
-	}
-
-	ifbInfLink, err := netlink.LinkByName(ifbInf)
-	if err != nil {
-		return err
-	}
-
+	// Command analog: 'tc qdisc add dev wgInf handle ffff: ingress'
 	filter := &netlink.U32{
 		FilterAttrs: netlink.FilterAttrs{
 			LinkIndex: wgInfLink.Attrs().Index,
@@ -124,15 +106,9 @@ func SetupTcBase(wgInf string) error {
 	}
 
 	// Create root HTB qdisc for IFB interface to shape ingress traffic
-	// tc qdisc add dev %s root handle 1: htb default 999
-
-	link, err = netlink.LinkByName(ifbInf)
-	if err != nil {
-		return err
-	}
-
+	// Command analog: 'tc qdisc add dev ifbInf root handle 1: htb default 999'
 	htb := netlink.NewHtb(netlink.QdiscAttrs{
-		LinkIndex: link.Attrs().Index,
+		LinkIndex: ifbInfLink.Attrs().Index,
 		Handle:    netlink.MakeHandle(1, 0),
 		Parent:    netlink.HANDLE_ROOT,
 	})
@@ -142,15 +118,20 @@ func SetupTcBase(wgInf string) error {
 		return err
 	}
 
-	commands := []string{
-		// Create default class with very high rate to avoid shaping traffic without specific rules
-		fmt.Sprintf("tc class add dev %s parent 1: classid 1:1 htb rate %s", ifbInf, rootRate),
+	// Create default class with very high rate to avoid shaping traffic without specific rules
+	// Command analog: 'tc class add dev ifbInf parent 1: classid 1:1 htb rate 100gbit'
+	classAttrs := netlink.ClassAttrs{
+		LinkIndex: ifbInfLink.Attrs().Index,
+		Parent:    netlink.MakeHandle(1, 0),
+		Handle:    netlink.MakeHandle(1, 1),
 	}
 
-	for _, cmd := range commands {
-		if _, err := shell.RunExecWithTimeout(cmd); err != nil {
-			return err
-		}
+	htbClass := netlink.NewHtbClass(classAttrs, netlink.HtbClassAttrs{
+		Rate: 100 * 1000 * 1000 * 1000 / 8, // в bytes per second! - 100gbit
+	})
+
+	if err = netlink.ClassAdd(htbClass); err != nil {
+		return err
 	}
 
 	logrus.Tracef("Traffic control rules for server enabled.")
@@ -161,12 +142,12 @@ func CheckTcBase(wgInf string) error {
 	const ifbInf = "ifb0"
 
 	//	Check creation of root HTB qdisc for wg interface
-	link, err := netlink.LinkByName(wgInf)
+	wgInfLink, err := netlink.LinkByName(wgInf)
 	if err != nil {
 		return err
 	}
 
-	qdiscs, err := netlink.QdiscList(link)
+	qdiscs, err := netlink.QdiscList(wgInfLink)
 	if err != nil {
 		return err
 	}
@@ -179,7 +160,8 @@ func CheckTcBase(wgInf string) error {
 	}
 
 	// Check creation of IFB interface
-	link, err = netlink.LinkByName(ifbInf)
+
+	ifbInfLink, err := netlink.LinkByName(ifbInf)
 	if err != nil {
 		if _, ok := err.(netlink.LinkNotFoundError); ok {
 			return errors.New("IFB interface doesnt exist:" + err.Error())
@@ -189,18 +171,12 @@ func CheckTcBase(wgInf string) error {
 	}
 
 	// Check if IFB interface is up
-	if link.Attrs().Flags&net.FlagUp == 0 {
+	if ifbInfLink.Attrs().Flags&net.FlagUp == 0 {
 		return errors.New("IFB interface is not up")
 	}
 
 	// Check creation of ingress qdisc and filter on wg interface and redirect all ingress traffic to IFB interface
-
-	link, err = netlink.LinkByName(wgInf)
-	if err != nil {
-		return err
-	}
-
-	qdiscs, err = netlink.QdiscList(link)
+	qdiscs, err = netlink.QdiscList(wgInfLink)
 	if err != nil {
 		return err
 	}
@@ -212,7 +188,7 @@ func CheckTcBase(wgInf string) error {
 		}
 	}
 
-	filters, err := netlink.FilterList(link, netlink.MakeHandle(0xffff, 0))
+	filters, err := netlink.FilterList(wgInfLink, netlink.MakeHandle(0xffff, 0))
 	if err != nil {
 		return err
 	}
@@ -222,12 +198,7 @@ func CheckTcBase(wgInf string) error {
 	}
 
 	// Check creation of root HTB qdisc for IFB interface to shape ingress traffic
-	link, err = netlink.LinkByName(ifbInf)
-	if err != nil {
-		return err
-	}
-
-	qdiscs, err = netlink.QdiscList(link)
+	qdiscs, err = netlink.QdiscList(ifbInfLink)
 	if err != nil {
 		return err
 	}
@@ -238,6 +209,19 @@ func CheckTcBase(wgInf string) error {
 			if htb.Handle == netlink.MakeHandle(1, 0) {
 				return nil
 			}
+		}
+	}
+
+	// Check creation of default class with very high rate to avoid shaping traffic without specific rules
+	classes, err := netlink.ClassList(ifbInfLink, netlink.MakeHandle(1, 0))
+	if err != nil {
+		return err
+	}
+
+	for _, c := range classes {
+		// TODO: Check class matching
+		if c.Attrs().Handle == netlink.MakeHandle(1, 1) {
+			return nil
 		}
 	}
 
