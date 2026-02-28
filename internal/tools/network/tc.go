@@ -269,6 +269,23 @@ func ApplyTcForPeer(wgInf, ifbInf string, peerIp net.IP, serverNetworkMask net.I
 	return nil
 }
 
+func CheckTcPeerRules(wgInf, ifbInf string, peerIp net.IP, serverNetworkMask net.IPMask, downloadSpeedMb, uploadSpeedMb uint) error {
+	//Check htb class for peer with specified download speed
+	hostNum := hostNumber(peerIp, serverNetworkMask)
+
+	wgInfLink, err := tryLink(wgInf)
+	if err != nil {
+		return err
+	}
+
+	// TODO: Add more checks (rate, ceil) and add typed errors
+	if err = hasClass(wgInfLink, netlink.MakeHandle(1, uint16(hostNum)), netlink.MakeHandle(1, 1)); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // DiscardTcForPeer removes the traffic control rules for a peer with the given IP address.
 // It calculates the host number based on the peer's IP and the server's network mask, and then uses that host number to delete the tc rules for that peer.
 //
