@@ -204,16 +204,44 @@ func CheckTcBaseRules(wgInf, ifbInf string) error {
 // - 'downloadSpeedMb' is the download speed limit for the peer in megabits per second (e.g. 100)
 //
 // - 'uploadSpeedMb' is the upload speed limit for the peer in megabits per second (e.g. 50)
-func ApplyTcForPeer(wgInf, ifbInf string, peerIp net.IP, serverNetworkMask net.IPMask, downloadSpeedMb, uploadSpeedMb int) error {
+func ApplyTcForPeer(wgInf, ifbInf string, peerIp net.IP, serverNetworkMask net.IPMask, downloadSpeedMb, uploadSpeedMb uint) error {
 	hostNum := hostNumber(peerIp, serverNetworkMask)
 
-	commands := []string{
-		//
-		// 		Add rules to limit server egress for peer (client download bandwidth)
-		//
+	//
+	// 		Add rules to limit server egress for peer (client download bandwidth)
+	//
 
-		// Create class for peer with specified download speed
-		fmt.Sprintf("tc class add dev %[1]s parent 1:1 classid 1:%[2]v htb rate %[3]vmbit ceil %[3]vmbit", wgInf, hostNum, downloadSpeedMb),
+	// Create class for peer with specified download speed
+	// Command analog: 'tc class add dev wgInf parent 1:1 classid 1:{hostNum} htb rate {RATE}mbit ceil {RATE}mbit'
+	wgInfLink, err := tryLink(wgInf)
+	if err != nil {
+		return err
+	}
+
+	classID := netlink.MakeHandle(1, uint16(hostNum))
+	parent := netlink.MakeHandle(1, 1)
+	rate := uint64(downloadSpeedMb) * 1024 * 1024 / 8 // mbit → bytes/sec
+	ceil := rate
+
+	classAttrs := netlink.ClassAttrs{
+		LinkIndex: wgInfLink.Attrs().Index,
+		Parent:    parent,
+		Handle:    classID,
+	}
+	htbAttrs := netlink.HtbClassAttrs{
+		Rate: rate,
+		Ceil: ceil,
+	}
+	class := netlink.NewHtbClass(classAttrs, htbAttrs)
+	if err = netlink.ClassAdd(class); err != nil {
+		return err
+	}
+
+	// Create filters to direct traffic to peer to the class
+	// 'tc filter add dev wgInf protocol ip parent 1: prio {hostNum} u32 match ip src {peerIp} flowid 1:{hostNum}'
+	// 'tc filter add dev wgInf protocol ip parent 1: prio {hostNum} u32 match ip dst {peerIp} flowid 1:{hostNum}'
+
+	commands := []string{
 
 		// Create filters to direct traffic to peer to the class
 		fmt.Sprintf("tc filter add dev %[1]s protocol ip parent 1: prio %[2]v u32 match ip src %[3]v flowid 1:%[2]v", wgInf, hostNum, peerIp),
