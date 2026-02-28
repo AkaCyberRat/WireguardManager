@@ -14,6 +14,7 @@ import (
 
 	"WireguardManager/internal/config"
 	"WireguardManager/internal/logging"
+	"WireguardManager/internal/tools/ipt"
 	"WireguardManager/internal/tools/tc"
 	"WireguardManager/internal/tools/wg"
 
@@ -64,6 +65,10 @@ func main() {
 		logrus.Fatal("Failed to load config: ", err.Error())
 	}
 
+	//
+	// 		Server actions
+	//
+
 	// Setup Wg interface
 
 	wgService, err := wg.NewWgService()
@@ -94,21 +99,33 @@ func main() {
 		logrus.Infof("Tc base rules exist")
 	}
 
-	// Setup NAT for wg interface
+	// Add NAT rules and check them
+	iptablesTool, err := ipt.NewIptablesTool()
+	if err != nil {
+		logrus.Fatal("Failed to create iptables tool: ", err)
+	}
 
 	wgNetPrefix := netip.MustParsePrefix(fmt.Sprintf("%s/%d", WgServerIp, WgServerMask))
+	wgNetParams := ipt.WgNatParams{
+		WgInf:  WgInfName,
+		GwInf:  GwInfName,
+		WgPort: port,
+		WgNet:  wgNetPrefix,
+	}
 
-	if err := wgService.SetupWgNAT(WgInfName, GwInfName, port, wgNetPrefix); err != nil {
-		logrus.Fatal("Failed to setup WgNAT: ", err.Error())
+	if err := iptablesTool.AddWgNatRules(wgNetParams); err != nil {
+		logrus.Fatal("Failed to add wg NAT rules: ", err)
 	}
 	logrus.Infof("NAT enabled")
 
-	// Check NAT for wg interface
-
-	if err := wgService.CheckWgNatRules(WgInfName, GwInfName, port, wgNetPrefix); err != nil {
-		logrus.Fatal("Failed to check NAT rules existence: ", err)
+	if err := iptablesTool.CheckWgNatRules(wgNetParams); err != nil {
+		logrus.Fatal("Failed to check wg NAT rules: ", err)
 	}
 	logrus.Infof("Wg nat exists")
+
+	//
+	// 		Peer actions
+	//
 
 	wgPeerMask := net.CIDRMask(WgPeerMask, 32)
 	peerPublicKey := conf.PeerPublicKey
@@ -132,7 +149,7 @@ func main() {
 
 	}
 
-	go StartTimedValidator(context.Background(), 30*time.Second, wgService, conf)
+	go StartTimedValidator(context.Background(), 30*time.Second, wgService, iptablesTool, conf)
 
 	// Wait for exit  signal
 	waitForExitSignal()
@@ -141,7 +158,7 @@ func main() {
 
 }
 
-func StartTimedValidator(ctx context.Context, interval time.Duration, wgService wg.WgService, config Configuration) {
+func StartTimedValidator(ctx context.Context, interval time.Duration, wgService wg.WgService, iptablesTool ipt.IptablesTool, config Configuration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
@@ -149,7 +166,7 @@ func StartTimedValidator(ctx context.Context, interval time.Duration, wgService 
 		select {
 		case <-ticker.C:
 			startTime := time.Now()
-			err := ValidateOnce(wgService, config)
+			err := ValidateOnce(wgService, iptablesTool, config)
 			duration := time.Since(startTime)
 
 			if err != nil {
@@ -164,14 +181,19 @@ func StartTimedValidator(ctx context.Context, interval time.Duration, wgService 
 	}
 }
 
-func ValidateOnce(wgService wg.WgService, config Configuration) error {
+func ValidateOnce(wgService wg.WgService, iptablesTool ipt.IptablesTool, config Configuration) error {
 	wgNetPrefix := netip.MustParsePrefix(fmt.Sprintf("%s/%d", WgServerIp, WgServerMask))
 
 	if err := wgService.CheckWgInterface(WgInfName); err != nil {
 		return fmt.Errorf("wg interface check failed: %w", err)
 	}
 
-	if err := wgService.CheckWgNatRules(WgInfName, GwInfName, config.ServerPort, wgNetPrefix); err != nil {
+	if err := iptablesTool.CheckWgNatRules(ipt.WgNatParams{
+		WgInf:  WgInfName,
+		GwInf:  GwInfName,
+		WgPort: config.ServerPort,
+		WgNet:  wgNetPrefix,
+	}); err != nil {
 		return fmt.Errorf("wg nat check failed: %w", err)
 	}
 

@@ -4,13 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"net/netip"
 	"os"
 
 	"golang.zx2c4.com/wireguard/wgctrl"
 
-	"github.com/coreos/go-iptables/iptables"
-	"github.com/google/shlex"
 	"github.com/vishvananda/netlink"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
@@ -22,7 +19,6 @@ const (
 
 type WgService struct {
 	client *wgctrl.Client
-	ipt    *iptables.IPTables
 }
 
 func NewWgService() (WgService, error) {
@@ -33,12 +29,7 @@ func NewWgService() (WgService, error) {
 		return empty, err
 	}
 
-	ipt, err := iptables.New()
-	if err != nil {
-		return empty, err
-	}
-
-	return WgService{client: client, ipt: ipt}, nil
+	return WgService{client: client}, nil
 }
 
 // SetupWgInterface creates and configures a wireguard interface with the given parameters.
@@ -218,105 +209,6 @@ func (s *WgService) RemoveWgPeer(wgInf string, ip net.IP, mask net.IPMask, publi
 	}
 
 	return s.client.ConfigureDevice(wgInf, wgtypes.Config{Peers: []wgtypes.PeerConfig{peer}})
-}
-
-// SetupWgNAT turns on ipt (legacy) NAT for packets forwarding between interfaces.
-//
-// - wgInf is the name of wg interface (e.g. wg0)
-//
-// - gwInf is the name of gateway interface (e.g. eth0)
-//
-// - wgPort is the port number on which wg server listens (e.g. 51820)
-//
-// - wgNet is the CIDR prefix of wg network (e.g. '11.0.0.0/24')
-func (s *WgService) SetupWgNAT(wgInf string, gwInf string, wgPort int, wgNet netip.Prefix) error {
-	commands := wgNatCommands(wgInf, gwInf, wgPort, wgNet)
-
-	for _, command := range commands {
-		args, err := shlex.Split(command)
-		if err != nil {
-			return err
-		}
-
-		if err = s.ipt.AppendUnique(args[1], args[3], args[4:]...); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// CheckWgNatRules checks ipt (legacy) NAT rules existence.
-//
-// - wgInf is the name of wg interface (e.g. wg0)
-//
-// - gwInf is the name of gateway interface (e.g. eth0)
-//
-// - wgPort is the port number on which wg server listens (e.g. 51820)
-//
-// - wgNet is the CIDR prefix of wg network (e.g. '11.0.0.0/24')
-//
-// Returns nil if all rules exist, returns ErrNotExist if any rule does not exist, otherwise returns an error.
-func (s *WgService) CheckWgNatRules(wgInf string, gwInf string, wgPort int, wgNet netip.Prefix) error {
-	commands := wgNatCommands(wgInf, gwInf, wgPort, wgNet)
-
-	for _, command := range commands {
-		args, err := shlex.Split(command)
-		if err != nil {
-			return err
-		}
-
-		exists, err := s.ipt.Exists(args[1], args[3], args[4:]...)
-		if err != nil {
-			return err
-		}
-
-		if !exists {
-			return fmt.Errorf("nat rules %w: %v", ErrNotExist, command)
-		}
-	}
-
-	return nil
-}
-
-// DeleteWgNat delete ipt (legacy) NAT rules if exists.
-//
-// - wgInf is the name of wg interface (e.g. wg0)
-//
-// - gwInf is the name of gateway interface (e.g. eth0)
-//
-// - wgPort is the port number on which wg server listens (e.g. 51820)
-//
-// - wgNet is the CIDR prefix of wg network (e.g. '11.0.0.0/24')
-func (s *WgService) DeleteWgNat(wgInf string, gwInf string, wgPort int, wgNet netip.Prefix) error {
-	commands := wgNatCommands(wgInf, gwInf, wgPort, wgNet)
-
-	for _, command := range commands {
-		args, err := shlex.Split(command)
-		if err != nil {
-			return err
-		}
-
-		if err = s.ipt.DeleteIfExists(args[1], args[3], args[4:]...); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func wgNatCommands(wgInf string, gwInf string, wgPort int, wgNet netip.Prefix) []string {
-	return []string{
-		// NAT for wg interface
-		fmt.Sprintf("-t nat -A POSTROUTING -s %v -o %v -j MASQUERADE", wgNet, gwInf),
-		fmt.Sprintf("-t filter -A INPUT -p udp -m udp --dport %v -j ACCEPT", wgPort),
-		fmt.Sprintf("-t filter -A FORWARD -i %v -j ACCEPT", wgInf),
-		fmt.Sprintf("-t filter -A FORWARD -o %v -j ACCEPT", wgInf),
-
-		// DNS redirect
-		fmt.Sprintf("-t nat -A PREROUTING -i %v -p udp --dport 53 -j DNAT --to-destination 8.8.8.8:53", wgInf),
-		fmt.Sprintf("-t nat -A PREROUTING -i %v -p tcp --dport 53 -j DNAT --to-destination 8.8.8.8:53", wgInf),
-	}
 }
 
 //

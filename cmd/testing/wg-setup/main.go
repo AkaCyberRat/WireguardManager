@@ -11,6 +11,7 @@ import (
 
 	"WireguardManager/internal/config"
 	"WireguardManager/internal/logging"
+	"WireguardManager/internal/tools/ipt"
 	"WireguardManager/internal/tools/wg"
 
 	"github.com/sirupsen/logrus"
@@ -76,21 +77,29 @@ func main() {
 	}
 	logrus.Infof("Peer enabled")
 
-	// Setup NAT for wg interface
+	// Add NAT rules and check them
+	iptablesTool, err := ipt.NewIptablesTool()
+	if err != nil {
+		logrus.Fatal("Failed to create iptables tool: ", err)
+	}
 
 	wgNetPrefix := netip.MustParsePrefix(fmt.Sprintf("%s/%d", WgServerIp, WgServerMask))
+	wgNetParams := ipt.WgNatParams{
+		WgInf:  WgInfName,
+		GwInf:  GwInfName,
+		WgPort: port,
+		WgNet:  wgNetPrefix,
+	}
 
-	if err := wgService.SetupWgNAT(WgInfName, GwInfName, port, wgNetPrefix); err != nil {
-		logrus.Fatal("Failed to setup WgNAT: ", err.Error())
+	if err := iptablesTool.AddWgNatRules(wgNetParams); err != nil {
+		logrus.Fatal("Failed to add wg NAT rules: ", err)
 	}
 	logrus.Infof("NAT enabled")
 
-	// Check NAT for wg interface
-
-	if err := wgService.CheckWgNatRules(WgInfName, GwInfName, port, wgNetPrefix); err != nil {
-		logrus.Fatal("Failed to check NAT rules existence: ", err)
+	if err := iptablesTool.CheckWgNatRules(wgNetParams); err != nil {
+		logrus.Fatal("Failed to check wg NAT rules: ", err)
 	}
-	logrus.Info("wg nat exists")
+	logrus.Infof("Wg nat exists")
 
 	// Wait for exit signal
 	waitForExitSignal()
