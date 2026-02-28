@@ -28,7 +28,7 @@ type Configuration struct {
 
 type Peer struct {
 	Ip    string
-	Speed int
+	Speed uint
 }
 
 func (c Configuration) ToDefault() config.Configuration {
@@ -81,13 +81,13 @@ func main() {
 	logrus.Infof("Server enabled")
 
 	// Setup TC base rules
-	if err := network.SetupTcBase(WgInfName); err != nil {
+	if err := network.SetupTcBase(WgInfName, IfbInfName); err != nil {
 		logrus.Fatal("Failed to setup tc base: ", err.Error())
 	}
 	logrus.Infof("Tc base enabled")
 
 	// Check TC base rules
-	if err := network.CheckTcBaseRules(WgInfName); err != nil {
+	if err := network.CheckTcBaseRules(WgInfName, IfbInfName); err != nil {
 		logrus.Fatal("Failed to check tc base rules existence: ", err)
 	} else {
 		logrus.Infof("Tc base rules exist")
@@ -124,7 +124,7 @@ func main() {
 
 		// Setup Tc for peer
 
-		if err := network.ApplyTcForPeer(WgInfName, wgPeerIp, wgServerMask, peer.Speed, peer.Speed); err != nil {
+		if err := network.ApplyTcForPeer(WgInfName, IfbInfName, wgPeerIp, wgServerMask, peer.Speed, peer.Speed); err != nil {
 			logrus.Fatal("Failed to apply tc rules for peer: ", err.Error())
 		}
 		logrus.Infof("Tc rules for peer %d enabled", i)
