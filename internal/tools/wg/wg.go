@@ -211,6 +211,20 @@ func (s *WgService) RemoveWgPeer(wgInf string, ip net.IP, mask net.IPMask, publi
 	return s.client.ConfigureDevice(wgInf, wgtypes.Config{Peers: []wgtypes.PeerConfig{peer}})
 }
 
+func GeneratePrivateKey() (string, error) {
+	prKey, err := wgtypes.GeneratePrivateKey()
+	return prKey.String(), err
+}
+
+func GeneratePublicKey(privateKey string) (string, error) {
+	prKey, err := wgtypes.ParseKey(privateKey)
+	if err != nil {
+		return "", err
+	}
+
+	return prKey.PublicKey().String(), nil
+}
+
 //
 // Helpers
 //

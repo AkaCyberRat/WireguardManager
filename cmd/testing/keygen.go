@@ -2,19 +2,20 @@ package main
 
 import (
 	"WireguardManager/internal/logging"
-	"WireguardManager/internal/tools/network"
+	"WireguardManager/internal/tools/wg"
+
 	"github.com/sirupsen/logrus"
 )
 
 func main() {
 	logging.SetTempConfiguration()
 
-	privateKey, err := network.GeneratePrivateKey()
+	privateKey, err := wg.GeneratePrivateKey()
 	if err != nil {
 		logrus.Fatal("Failed to generate private key:", err.Error())
 	}
 
-	publicKey, err := network.GeneratePublicKey(privateKey)
+	publicKey, err := wg.GeneratePublicKey(privateKey)
 	if err != nil {
 		logrus.Fatal("Failed to generate public key:", err.Error())
 	}
