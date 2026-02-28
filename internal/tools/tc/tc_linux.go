@@ -11,24 +11,43 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+type TcTool struct {
+	handle *netlink.Handle
+}
+
+func NewTcTool() (TcTool, error) {
+	var empty TcTool
+
+	handle, err := netlink.NewHandle()
+	if err != nil {
+		return empty, err
+	}
+
+	return TcTool{handle: handle}, nil
+}
+
+func (t *TcTool) Close() {
+	t.handle.Close()
+}
+
 // SetupTcBase sets up the base traffic control rules for the Wireguard interface and IFB interface.
 //
 // - 'wgInf' is the name of the Wireguard interface (e.g. 'wg0')
 //
 // - 'ifbInf' is the name of the IFB interface to be used for ingress shaping (e.g. 'ifb0')
-func SetupTcBase(wgInf, ifbInf string) error {
+func (t *TcTool) SetupTcBase(wgInf, ifbInf string) error {
 	//
 	// 		Add base rule(s) to limit server egress (client download bandwidth)
 	//
 
 	// Create root HTB qdisc for wg interface
 	// Command analog: 'tc qdisc add dev wgInf root handle 1: htb'
-	wgInfLink, err := netlink.LinkByName(wgInf)
+	wgInfLink, err := t.tryLink(wgInf)
 	if err != nil {
 		return err
 	}
 
-	if err := netlink.LinkSetUp(wgInfLink); err != nil {
+	if err := t.handle.LinkSetUp(wgInfLink); err != nil {
 		return err
 	}
 
@@ -38,7 +57,7 @@ func SetupTcBase(wgInf, ifbInf string) error {
 		Parent:    netlink.HANDLE_ROOT,
 	})
 
-	if err := netlink.QdiscAdd(htbQdisc); err != nil {
+	if err := t.handle.QdiscAdd(htbQdisc); err != nil {
 		return err
 	}
 
@@ -54,17 +73,17 @@ func SetupTcBase(wgInf, ifbInf string) error {
 		},
 	}
 
-	if err := netlink.LinkAdd(ifb); err != nil {
+	if err := t.handle.LinkAdd(ifb); err != nil {
 		return err
 	}
 
 	// Command analog: 'ip link set ifbInf up'
-	ifbInfLink, err := netlink.LinkByName(ifbInf)
+	ifbInfLink, err := t.tryLink(ifbInf)
 	if err != nil {
 		return err
 	}
 
-	if err := netlink.LinkSetUp(ifbInfLink); err != nil {
+	if err := t.handle.LinkSetUp(ifbInfLink); err != nil {
 		return err
 	}
 
@@ -78,7 +97,7 @@ func SetupTcBase(wgInf, ifbInf string) error {
 		},
 	}
 
-	if err = netlink.QdiscAdd(ingressQdisc); err != nil {
+	if err = t.handle.QdiscAdd(ingressQdisc); err != nil {
 		return err
 	}
 
@@ -101,7 +120,7 @@ func SetupTcBase(wgInf, ifbInf string) error {
 		},
 	}
 
-	if err = netlink.FilterAdd(filter); err != nil {
+	if err = t.handle.FilterAdd(filter); err != nil {
 		return err
 	}
 
@@ -114,7 +133,7 @@ func SetupTcBase(wgInf, ifbInf string) error {
 	})
 	htb.Defcls = 999
 
-	if err = netlink.QdiscAdd(htb); err != nil {
+	if err = t.handle.QdiscAdd(htb); err != nil {
 		return err
 	}
 
@@ -130,7 +149,7 @@ func SetupTcBase(wgInf, ifbInf string) error {
 		Rate: 100 * 1000 * 1000 * 1000 / 8, // bytes per second! - 100gbit
 	})
 
-	if err = netlink.ClassAdd(htbClass); err != nil {
+	if err = t.handle.ClassAdd(htbClass); err != nil {
 		return err
 	}
 
@@ -145,20 +164,20 @@ func SetupTcBase(wgInf, ifbInf string) error {
 // - 'ifbInf' is the name of the IFB interface to be used for ingress shaping (e.g. 'ifb0')
 //
 // Returns an error if any of the required rules are missing or if there is an issue accessing the network interfaces.
-func CheckTcBaseRules(wgInf, ifbInf string) error {
+func (t *TcTool) CheckTcBaseRules(wgInf, ifbInf string) error {
 	// Check creation of WG interface
-	wgInfLink, err := tryLink(wgInf)
+	wgInfLink, err := t.tryLink(wgInf)
 	if err != nil {
 		return err
 	}
 
 	//	Check root HTB qdisc for wg interface
-	if err = hasQdisc(wgInfLink, netlink.MakeHandle(1, 0), netlink.HANDLE_ROOT); err != nil {
+	if err = t.hasQdisc(wgInfLink, netlink.MakeHandle(1, 0), netlink.HANDLE_ROOT); err != nil {
 		return fmt.Errorf("wg root htb qdisc check failed: %s", err)
 	}
 
 	// Check IFB interface
-	ifbInfLink, err := tryLink(ifbInf)
+	ifbInfLink, err := t.tryLink(ifbInf)
 	if err != nil {
 		return err
 	}
@@ -169,44 +188,47 @@ func CheckTcBaseRules(wgInf, ifbInf string) error {
 	}
 
 	// Check ingress qdisc on wg interface
-	if err = hasQdisc(wgInfLink, netlink.MakeHandle(0xffff, 0), netlink.HANDLE_INGRESS); err != nil {
+	if err = t.hasQdisc(wgInfLink, netlink.MakeHandle(0xffff, 0), netlink.HANDLE_INGRESS); err != nil {
 		return fmt.Errorf("wg ingress qdisc check failed: %s", err)
 	}
 
 	// Check creation of filter on wg interface and redirect all ingress traffic to IFB interface
-	if err = hasU32EgressRedirectFilter(wgInfLink, netlink.MakeHandle(0xffff, 0)); err != nil {
+	if err = t.hasU32EgressRedirectFilter(wgInfLink, netlink.MakeHandle(0xffff, 0)); err != nil {
 		return fmt.Errorf("wg ingress redirect filter check failed: %s", err)
 	}
 
 	// Check creation of root HTB qdisc for IFB interface to shape ingress traffic
-	if err = hasQdisc(ifbInfLink, netlink.MakeHandle(1, 0), netlink.HANDLE_ROOT); err != nil {
+	if err = t.hasQdisc(ifbInfLink, netlink.MakeHandle(1, 0), netlink.HANDLE_ROOT); err != nil {
 		return fmt.Errorf("ifb root htb qdisc check failed: %s", err)
 	}
 
 	// Check creation of default class with very high rate to avoid shaping traffic without specific rules
-	if err = hasClass(ifbInfLink, netlink.MakeHandle(1, 1), netlink.MakeHandle(1, 0)); err != nil {
+	if err = t.hasClass(ifbInfLink, netlink.MakeHandle(1, 1), netlink.MakeHandle(1, 0)); err != nil {
 		return fmt.Errorf("ifb default htb class check failed: %s", err)
 	}
 
 	return nil
 }
 
+type TcPeerParams struct {
+	// WgInf is the name of the Wireguard interface (e.g. 'wg0')
+	WgInf string
+	// IfbInf is the name of the IFB interface to be used for ingress shaping (e.g. 'ifb0')
+	IfbInf string
+	// PeerIp is the IP address of the peer (e.g. '11.0.0.1')
+	PeerIp net.IP
+	// ServerNetworkMask is the subnet mask of the server's network (e.g. '24')
+	ServerNetworkMask net.IPMask
+	// DownloadSpeedMb is the download speed limit for the peer in megabits per second (e.g. 100)
+	DownloadSpeedMb uint
+	// UploadSpeedMb is the upload speed limit for the peer in megabits per second (e.g. 50)
+	UploadSpeedMb uint
+}
+
 // ApplyTcForPeer applies traffic control rules for a peer with the given IP address, download speed, and upload speed.
 // It calculates the host number based on the peer's IP and the server's network mask, and then uses that host number to create unique tc rules for that peer.
-//
-// - 'wgInf' is the name of the Wireguard interface (e.g. 'wg0')
-//
-// - 'ifbInf' is the name of the IFB interface to be used for ingress shaping (e.g. 'ifb0')
-//
-// - 'peerIp' is the IP address of the peer (e.g. '11.0.0.1')
-//
-// - 'serverNetworkMask' is the subnet mask of the server's network (e.g. '24')
-//
-// - 'downloadSpeedMb' is the download speed limit for the peer in megabits per second (e.g. 100)
-//
-// - 'uploadSpeedMb' is the upload speed limit for the peer in megabits per second (e.g. 50)
-func ApplyTcForPeer(wgInf, ifbInf string, peerIp net.IP, serverNetworkMask net.IPMask, downloadSpeedMb, uploadSpeedMb uint) error {
-	hostNum := hostNumber(peerIp, serverNetworkMask)
+func (t *TcTool) ApplyTcForPeer(params TcPeerParams) error {
+	hostNum := hostNumber(params.PeerIp, params.ServerNetworkMask)
 
 	//
 	// 		Add rules to limit server egress for peer (client download bandwidth)
@@ -214,14 +236,14 @@ func ApplyTcForPeer(wgInf, ifbInf string, peerIp net.IP, serverNetworkMask net.I
 
 	// Create class for peer with specified download speed
 	// Command analog: 'tc class add dev wgInf parent 1:1 classid 1:{hostNum} htb rate {RATE}mbit ceil {RATE}mbit'
-	wgInfLink, err := tryLink(wgInf)
+	wgInfLink, err := t.tryLink(params.WgInf)
 	if err != nil {
 		return err
 	}
 
 	classID := netlink.MakeHandle(1, uint16(hostNum))
 	parent := netlink.MakeHandle(1, 1)
-	rate := uint64(downloadSpeedMb) * 1000 * 1000 // mbit → bytes/sec
+	rate := uint64(params.DownloadSpeedMb) * 1000 * 1000 // mbit → bytes/sec
 	ceil := rate
 
 	classAttrs := netlink.ClassAttrs{
@@ -234,7 +256,7 @@ func ApplyTcForPeer(wgInf, ifbInf string, peerIp net.IP, serverNetworkMask net.I
 		Ceil: ceil,
 	}
 	class := netlink.NewHtbClass(classAttrs, htbAttrs)
-	if err = netlink.ClassAdd(class); err != nil {
+	if err = t.handle.ClassAdd(class); err != nil {
 		return err
 	}
 
@@ -245,19 +267,19 @@ func ApplyTcForPeer(wgInf, ifbInf string, peerIp net.IP, serverNetworkMask net.I
 	commands := []string{
 
 		// Create filters to direct traffic to peer to the class
-		fmt.Sprintf("tc filter add dev %[1]s protocol ip parent 1: prio %[2]v u32 match ip src %[3]v flowid 1:%[2]v", wgInf, hostNum, peerIp),
-		fmt.Sprintf("tc filter add dev %[1]s protocol ip parent 1: prio %[2]v u32 match ip dst %[3]v flowid 1:%[2]v", wgInf, hostNum, peerIp),
+		fmt.Sprintf("tc filter add dev %[1]s protocol ip parent 1: prio %[2]v u32 match ip src %[3]v flowid 1:%[2]v", params.WgInf, hostNum, params.PeerIp),
+		fmt.Sprintf("tc filter add dev %[1]s protocol ip parent 1: prio %[2]v u32 match ip dst %[3]v flowid 1:%[2]v", params.WgInf, hostNum, params.PeerIp),
 
 		//
 		// 		Add rules to limit server ingress for peer (client upload bandwidth)
 		//
 
 		// Create class for peer with specified upload speed
-		fmt.Sprintf("tc class add dev %s parent 1: classid 1:%d htb rate %vmbit ceil %vmbit", ifbInf, hostNum, uploadSpeedMb, uploadSpeedMb),
+		fmt.Sprintf("tc class add dev %s parent 1: classid 1:%d htb rate %vmbit ceil %vmbit", params.IfbInf, hostNum, params.UploadSpeedMb, params.UploadSpeedMb),
 
 		// Create filters to direct traffic from peer to the class
-		fmt.Sprintf("tc filter add dev %s parent 1: protocol ip prio 1 u32 match ip src %s flowid 1:%d", ifbInf, peerIp, hostNum),
-		fmt.Sprintf("tc qdisc add dev %s parent 1:%d fq_codel", ifbInf, hostNum),
+		fmt.Sprintf("tc filter add dev %s parent 1: protocol ip prio 1 u32 match ip src %s flowid 1:%d", params.IfbInf, params.PeerIp, hostNum),
+		fmt.Sprintf("tc qdisc add dev %s parent 1:%d fq_codel", params.IfbInf, hostNum),
 	}
 
 	// TODO: Add error context
@@ -270,17 +292,17 @@ func ApplyTcForPeer(wgInf, ifbInf string, peerIp net.IP, serverNetworkMask net.I
 	return nil
 }
 
-func CheckTcPeerRules(wgInf, ifbInf string, peerIp net.IP, serverNetworkMask net.IPMask, downloadSpeedMb, uploadSpeedMb uint) error {
+func (t *TcTool) CheckTcPeerRules(params TcPeerParams) error {
 	//Check htb class for peer with specified download speed
-	hostNum := hostNumber(peerIp, serverNetworkMask)
+	hostNum := hostNumber(params.PeerIp, params.ServerNetworkMask)
 
-	wgInfLink, err := tryLink(wgInf)
+	wgInfLink, err := t.tryLink(params.WgInf)
 	if err != nil {
 		return err
 	}
 
 	// TODO: Add more checks (rate, ceil) and add typed errors
-	if err = hasClass(wgInfLink, netlink.MakeHandle(1, uint16(hostNum)), netlink.MakeHandle(1, 1)); err != nil {
+	if err = t.hasClass(wgInfLink, netlink.MakeHandle(1, uint16(hostNum)), netlink.MakeHandle(1, 1)); err != nil {
 		return err
 	}
 
@@ -294,25 +316,25 @@ func CheckTcPeerRules(wgInf, ifbInf string, peerIp net.IP, serverNetworkMask net
 //
 // - 'peerIp' is the IP address of the peer (e.g. '11.0.0.1')
 // TODO: Actualize
-func DiscardTcForPeer(wgInf string, peerIp net.IP, serverNetworkMask net.IPMask) error {
-	hostNum := hostNumber(peerIp, serverNetworkMask)
+func DiscardTcForPeer(params TcPeerParams) error {
+	hostNum := hostNumber(params.PeerIp, params.ServerNetworkMask)
 
-	_, err := shell.RunExecWithTimeout(fmt.Sprintf("tc filter del dev %s parent 1: prio %v", wgInf, hostNum))
+	_, err := shell.RunExecWithTimeout(fmt.Sprintf("tc filter del dev %s parent 1: prio %v", params.WgInf, hostNum))
 	if err != nil {
 		return err
 	}
-	_, err = shell.RunExecWithTimeout(fmt.Sprintf("tc filter del dev %s ingress prio %v", wgInf, hostNum))
+	_, err = shell.RunExecWithTimeout(fmt.Sprintf("tc filter del dev %s ingress prio %v", params.WgInf, hostNum))
 	if err != nil {
 		return err
 	}
-	_, err = shell.RunExecWithTimeout(fmt.Sprintf("tc class del dev %s parent 1: classid 1:%v", wgInf, hostNum))
+	_, err = shell.RunExecWithTimeout(fmt.Sprintf("tc class del dev %s parent 1: classid 1:%v", params.WgInf, hostNum))
 	if err != nil {
 		return err
 	}
 
 	// wg ingress redirect
 	_, _ = shell.RunExecWithTimeout(
-		fmt.Sprintf("tc filter del dev %s ingress prio %v", wgInf, hostNum),
+		fmt.Sprintf("tc filter del dev %s ingress prio %v", params.WgInf, hostNum),
 	)
 
 	// ifb
@@ -326,8 +348,8 @@ func DiscardTcForPeer(wgInf string, peerIp net.IP, serverNetworkMask net.IPMask)
 	return nil
 }
 
-func tryLink(name string) (netlink.Link, error) {
-	link, err := netlink.LinkByName(name)
+func (t *TcTool) tryLink(name string) (netlink.Link, error) {
+	link, err := t.handle.LinkByName(name)
 	if err != nil {
 		if errors.As(err, new(netlink.LinkNotFoundError)) {
 			return nil, fmt.Errorf("%s interface doesn't exist: %w", name, err)
@@ -337,8 +359,8 @@ func tryLink(name string) (netlink.Link, error) {
 	return link, nil
 }
 
-func hasQdisc(link netlink.Link, handle, parent uint32) error {
-	qdiscs, err := netlink.QdiscList(link)
+func (t *TcTool) hasQdisc(link netlink.Link, handle, parent uint32) error {
+	qdiscs, err := t.handle.QdiscList(link)
 	if err != nil {
 		return err
 	}
@@ -352,8 +374,8 @@ func hasQdisc(link netlink.Link, handle, parent uint32) error {
 	return fmt.Errorf("qdisc not found ( Interface: '%s', Handle: '%v', Parent: '%v' )", link.Attrs().Name, handle, parent)
 }
 
-func hasClass(link netlink.Link, handle, parent uint32) error {
-	classes, err := netlink.ClassList(link, parent)
+func (t *TcTool) hasClass(link netlink.Link, handle, parent uint32) error {
+	classes, err := t.handle.ClassList(link, parent)
 	if err != nil {
 		return err
 	}
@@ -366,8 +388,8 @@ func hasClass(link netlink.Link, handle, parent uint32) error {
 	return fmt.Errorf("class not found ( Interface: '%s', Handle: '%v', Parent: '%v' )", link.Attrs().Name, handle, parent)
 }
 
-func hasU32EgressRedirectFilter(link netlink.Link, parent uint32) error {
-	filters, err := netlink.FilterList(link, parent)
+func (t *TcTool) hasU32EgressRedirectFilter(link netlink.Link, parent uint32) error {
+	filters, err := t.handle.FilterList(link, parent)
 	if err != nil {
 		return err
 	}

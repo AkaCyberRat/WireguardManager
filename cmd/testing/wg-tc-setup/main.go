@@ -86,14 +86,18 @@ func main() {
 	}
 	logrus.Infof("Server enabled")
 
-	// Setup TC base rules
-	if err := tc.SetupTcBase(WgInfName, IfbInfName); err != nil {
+	// Add TC rules and check them
+	tcTool, err := tc.NewTcTool()
+	if err != nil {
+		logrus.Fatal("Failed to create tc tool: ", err)
+	}
+
+	if err := tcTool.SetupTcBase(WgInfName, IfbInfName); err != nil {
 		logrus.Fatal("Failed to setup tc base: ", err.Error())
 	}
 	logrus.Infof("Tc base enabled")
 
-	// Check TC base rules
-	if err := tc.CheckTcBaseRules(WgInfName, IfbInfName); err != nil {
+	if err := tcTool.CheckTcBaseRules(WgInfName, IfbInfName); err != nil {
 		logrus.Fatal("Failed to check tc base rules existence: ", err)
 	} else {
 		logrus.Infof("Tc base rules exist")
@@ -142,14 +146,21 @@ func main() {
 
 		// Setup Tc for peer
 
-		if err := tc.ApplyTcForPeer(WgInfName, IfbInfName, wgPeerIp, wgServerMask, peer.Speed, peer.Speed); err != nil {
+		if err := tcTool.ApplyTcForPeer(tc.TcPeerParams{
+			WgInf:             WgInfName,
+			IfbInf:            IfbInfName,
+			PeerIp:            wgPeerIp,
+			ServerNetworkMask: wgServerMask,
+			DownloadSpeedMb:   peer.Speed,
+			UploadSpeedMb:     peer.Speed,
+		}); err != nil {
 			logrus.Fatal("Failed to apply tc rules for peer: ", err.Error())
 		}
 		logrus.Infof("Tc rules for peer %d enabled", i)
 
 	}
 
-	go StartTimedValidator(context.Background(), 30*time.Second, wgService, iptablesTool, conf)
+	go StartTimedValidator(context.Background(), 30*time.Second, wgService, iptablesTool, tcTool, conf)
 
 	// Wait for exit  signal
 	waitForExitSignal()
@@ -158,7 +169,7 @@ func main() {
 
 }
 
-func StartTimedValidator(ctx context.Context, interval time.Duration, wgService wg.WgService, iptablesTool ipt.IptablesTool, config Configuration) {
+func StartTimedValidator(ctx context.Context, interval time.Duration, wgService wg.WgService, iptablesTool ipt.IptablesTool, tcTool tc.TcTool, config Configuration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
@@ -166,7 +177,7 @@ func StartTimedValidator(ctx context.Context, interval time.Duration, wgService 
 		select {
 		case <-ticker.C:
 			startTime := time.Now()
-			err := ValidateOnce(wgService, iptablesTool, config)
+			err := ValidateOnce(wgService, iptablesTool, tcTool, config)
 			duration := time.Since(startTime)
 
 			if err != nil {
@@ -181,7 +192,7 @@ func StartTimedValidator(ctx context.Context, interval time.Duration, wgService 
 	}
 }
 
-func ValidateOnce(wgService wg.WgService, iptablesTool ipt.IptablesTool, config Configuration) error {
+func ValidateOnce(wgService wg.WgService, iptablesTool ipt.IptablesTool, tcTool tc.TcTool, config Configuration) error {
 	wgNetPrefix := netip.MustParsePrefix(fmt.Sprintf("%s/%d", WgServerIp, WgServerMask))
 
 	if err := wgService.CheckWgInterface(WgInfName); err != nil {
@@ -197,7 +208,7 @@ func ValidateOnce(wgService wg.WgService, iptablesTool ipt.IptablesTool, config 
 		return fmt.Errorf("wg nat check failed: %w", err)
 	}
 
-	if err := tc.CheckTcBaseRules(WgInfName, IfbInfName); err != nil {
+	if err := tcTool.CheckTcBaseRules(WgInfName, IfbInfName); err != nil {
 		return fmt.Errorf("tc validation failed: %w", err)
 	}
 
