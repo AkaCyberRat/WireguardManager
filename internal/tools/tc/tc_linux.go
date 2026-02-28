@@ -1,13 +1,14 @@
-package network
+package tc
 
 import (
 	"WireguardManager/pkg/shell"
 	"errors"
 	"fmt"
+	"net"
+
 	"github.com/sirupsen/logrus"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
-	"net"
 )
 
 // SetupTcBase sets up the base traffic control rules for the Wireguard interface and IFB interface.

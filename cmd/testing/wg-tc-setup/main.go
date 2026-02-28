@@ -15,6 +15,7 @@ import (
 	"WireguardManager/internal/config"
 	"WireguardManager/internal/logging"
 	"WireguardManager/internal/tools/network"
+	"WireguardManager/internal/tools/tc"
 
 	"github.com/sirupsen/logrus"
 )
@@ -81,13 +82,13 @@ func main() {
 	logrus.Infof("Server enabled")
 
 	// Setup TC base rules
-	if err := network.SetupTcBase(WgInfName, IfbInfName); err != nil {
+	if err := tc.SetupTcBase(WgInfName, IfbInfName); err != nil {
 		logrus.Fatal("Failed to setup tc base: ", err.Error())
 	}
 	logrus.Infof("Tc base enabled")
 
 	// Check TC base rules
-	if err := network.CheckTcBaseRules(WgInfName, IfbInfName); err != nil {
+	if err := tc.CheckTcBaseRules(WgInfName, IfbInfName); err != nil {
 		logrus.Fatal("Failed to check tc base rules existence: ", err)
 	} else {
 		logrus.Infof("Tc base rules exist")
@@ -124,7 +125,7 @@ func main() {
 
 		// Setup Tc for peer
 
-		if err := network.ApplyTcForPeer(WgInfName, IfbInfName, wgPeerIp, wgServerMask, peer.Speed, peer.Speed); err != nil {
+		if err := tc.ApplyTcForPeer(WgInfName, IfbInfName, wgPeerIp, wgServerMask, peer.Speed, peer.Speed); err != nil {
 			logrus.Fatal("Failed to apply tc rules for peer: ", err.Error())
 		}
 		logrus.Infof("Tc rules for peer %d enabled", i)
@@ -174,7 +175,7 @@ func ValidateOnce(wgService network.WgService, config Configuration) error {
 		return fmt.Errorf("wg nat check failed: %w", err)
 	}
 
-	if err := network.CheckTcBaseRules(WgInfName, IfbInfName); err != nil {
+	if err := tc.CheckTcBaseRules(WgInfName, IfbInfName); err != nil {
 		return fmt.Errorf("tc validation failed: %w", err)
 	}
 
