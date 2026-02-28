@@ -11,7 +11,7 @@ import (
 
 	"WireguardManager/internal/config"
 	"WireguardManager/internal/logging"
-	"WireguardManager/internal/tools/network"
+	"WireguardManager/internal/tools/wg"
 
 	"github.com/sirupsen/logrus"
 )
@@ -50,7 +50,7 @@ func main() {
 
 	// Setup Wg interface
 
-	wgService, err := network.NewWgService()
+	wgService, err := wg.NewWgService()
 	if err != nil {
 		logrus.Fatal("Failed to create WgService: ", err.Error())
 	}

@@ -14,8 +14,8 @@ import (
 
 	"WireguardManager/internal/config"
 	"WireguardManager/internal/logging"
-	"WireguardManager/internal/tools/network"
 	"WireguardManager/internal/tools/tc"
+	"WireguardManager/internal/tools/wg"
 
 	"github.com/sirupsen/logrus"
 )
@@ -66,7 +66,7 @@ func main() {
 
 	// Setup Wg interface
 
-	wgService, err := network.NewWgService()
+	wgService, err := wg.NewWgService()
 	if err != nil {
 		logrus.Fatal("Failed to create WgService: ", err.Error())
 	}
@@ -141,7 +141,7 @@ func main() {
 
 }
 
-func StartTimedValidator(ctx context.Context, interval time.Duration, wgService network.WgService, config Configuration) {
+func StartTimedValidator(ctx context.Context, interval time.Duration, wgService wg.WgService, config Configuration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
@@ -164,7 +164,7 @@ func StartTimedValidator(ctx context.Context, interval time.Duration, wgService 
 	}
 }
 
-func ValidateOnce(wgService network.WgService, config Configuration) error {
+func ValidateOnce(wgService wg.WgService, config Configuration) error {
 	wgNetPrefix := netip.MustParsePrefix(fmt.Sprintf("%s/%d", WgServerIp, WgServerMask))
 
 	if err := wgService.CheckWgInterface(WgInfName); err != nil {

@@ -2,13 +2,15 @@ package network
 
 import (
 	"WireguardManager/internal/core"
+	"WireguardManager/internal/tools/wg"
 	"WireguardManager/pkg/shell"
 	"errors"
 	"fmt"
-	"github.com/vishvananda/netlink"
 	"net"
 	"strconv"
 	"strings"
+
+	"github.com/vishvananda/netlink"
 
 	"github.com/sirupsen/logrus"
 	"golang.zx2c4.com/wireguard/wgctrl"
@@ -53,7 +55,7 @@ func (t *Tool) EnableServer(server *core.Server) error {
 		return err
 	}
 
-	logrus.Debugf("Server enabled. [IpNet=%v, InterfaceName=%v, Port=%v]", WgIpNet, t.interfaceName, t.port)
+	logrus.Debugf("Server enabled. [IpNet=%v, InterfaceName=%v, Port=%v]", wg.WgIpNet, t.interfaceName, t.port)
 	return nil
 }
 
@@ -67,7 +69,7 @@ func (t *Tool) DisableServer() error {
 		return err
 	}
 
-	logrus.Debugf("Server disabled. [IpNet=%v, InterfaceName=%v, Port=%v]", WgIpNet, t.interfaceName, t.port)
+	logrus.Debugf("Server disabled. [IpNet=%v, InterfaceName=%v, Port=%v]", wg.WgIpNet, t.interfaceName, t.port)
 	return nil
 }
 
@@ -134,7 +136,7 @@ func (t *Tool) wgServerUp(privateKey string) error {
 	linkAttrs.MTU = 1420
 	linkAttrs.TxQLen = 1000
 
-	wg_link := wgLink{}
+	wg_link := wg.WgLink{}
 	wg_link.LinkAttrs = &linkAttrs
 	wg_link.LinkType = "wireguard"
 
@@ -165,7 +167,7 @@ func (t *Tool) wgServerUp(privateKey string) error {
 		return err
 	}
 
-	addr, err := netlink.ParseAddr(WgIpNet)
+	addr, err := netlink.ParseAddr(wg.WgIpNet)
 	if err != nil {
 		return err
 	}
@@ -188,7 +190,7 @@ func (t *Tool) wgServerUp(privateKey string) error {
 		return err
 	}
 
-	logrus.Tracef("Wireguard interface enabled. [InterfaceName=%v, IpNet=%v, Port=%v]", t.interfaceName, WgIpNet, t.port)
+	logrus.Tracef("Wireguard interface enabled. [InterfaceName=%v, IpNet=%v, Port=%v]", t.interfaceName, wg.WgIpNet, t.port)
 	return nil
 }
 
@@ -198,7 +200,7 @@ func (t *Tool) wgServerDown() error {
 	linkAtrrs.MTU = 1420
 	linkAtrrs.TxQLen = 1000
 
-	link := wgLink{}
+	link := wg.WgLink{}
 	link.LinkAttrs = &linkAtrrs
 	link.LinkType = "wireguard"
 
@@ -206,7 +208,7 @@ func (t *Tool) wgServerDown() error {
 		return err
 	}
 
-	logrus.Tracef("Wireguard interface disabled. [InterfaceName=%v, IpNet=%v, Port=%v]", t.interfaceName, WgIpNet, t.port)
+	logrus.Tracef("Wireguard interface disabled. [InterfaceName=%v, IpNet=%v, Port=%v]", t.interfaceName, wg.WgIpNet, t.port)
 	return nil
 }
 
@@ -370,6 +372,13 @@ func (t *Tool) tcPeerDown(ip string) error {
 
 	logrus.Tracef("Traffic control rules for peer disabled. [Ip=%v]", ip)
 	return nil
+}
+
+func isWgExists(interfaceName string) bool {
+
+	_, err := netlink.LinkByName(interfaceName)
+
+	return err == nil
 }
 
 func getIpIndex(ip string) int {

@@ -1,12 +1,13 @@
-package network
+package wg
 
 import (
 	"errors"
 	"fmt"
-	"golang.zx2c4.com/wireguard/wgctrl"
 	"net"
 	"net/netip"
 	"os"
+
+	"golang.zx2c4.com/wireguard/wgctrl"
 
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/google/shlex"
@@ -66,7 +67,7 @@ func (s *WgService) SetupWgInterface(infName string, ip net.IP, mask net.IPMask,
 	linkAttrs.MTU = WgLinkMTU
 	linkAttrs.TxQLen = WgLinkTxQLen
 
-	wireguardLink := wgLink{}
+	wireguardLink := WgLink{}
 	wireguardLink.LinkType = WgLinkType
 	wireguardLink.LinkAttrs = &linkAttrs
 
@@ -322,22 +323,15 @@ func wgNatCommands(wgInf string, gwInf string, wgPort int, wgNet netip.Prefix) [
 // Helpers
 //
 
-func isWgExists(interfaceName string) bool {
-
-	_, err := netlink.LinkByName(interfaceName)
-
-	return err == nil
-}
-
-type wgLink struct {
+type WgLink struct {
 	LinkAttrs *netlink.LinkAttrs
 	LinkType  string
 }
 
-func (l wgLink) Attrs() *netlink.LinkAttrs {
+func (l WgLink) Attrs() *netlink.LinkAttrs {
 	return l.LinkAttrs
 }
 
-func (l wgLink) Type() string {
+func (l WgLink) Type() string {
 	return l.LinkType
 }
