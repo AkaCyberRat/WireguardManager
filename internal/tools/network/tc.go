@@ -220,7 +220,7 @@ func ApplyTcForPeer(wgInf, ifbInf string, peerIp net.IP, serverNetworkMask net.I
 
 	classID := netlink.MakeHandle(1, uint16(hostNum))
 	parent := netlink.MakeHandle(1, 1)
-	rate := uint64(downloadSpeedMb) * 1024 * 1024 / 8 // mbit → bytes/sec
+	rate := uint64(downloadSpeedMb) * 1024 * 1024 // mbit → bytes/sec
 	ceil := rate
 
 	classAttrs := netlink.ClassAttrs{
@@ -245,7 +245,7 @@ func ApplyTcForPeer(wgInf, ifbInf string, peerIp net.IP, serverNetworkMask net.I
 
 		// Create filters to direct traffic to peer to the class
 		fmt.Sprintf("tc filter add dev %[1]s protocol ip parent 1: prio %[2]v u32 match ip src %[3]v flowid 1:%[2]v", wgInf, hostNum, peerIp),
-		fmt.Sprintf("tc filter add dev %[1]s protocol ip parent 1: prio %[2]v u32 match ip dst %[3]v flowid 1:%[2]v", wgInf, hostNum, peerIp),
+		//fmt.Sprintf("tc filter add dev %[1]s protocol ip parent 1: prio %[2]v u32 match ip dst %[3]v flowid 1:%[2]v", wgInf, hostNum, peerIp),
 
 		//
 		// 		Add rules to limit server ingress for peer (client upload bandwidth)
