@@ -10,9 +10,12 @@ import (
 	"net"
 )
 
-func SetupTcBase(wgInf string) error {
-	const ifbInf = "ifb0"
-
+// SetupTcBase sets up the base traffic control rules for the Wireguard interface and IFB interface.
+//
+// - 'wgInf' is the name of the Wireguard interface (e.g. 'wg0')
+//
+// - 'ifbInf' is the name of the IFB interface to be used for ingress shaping (e.g. 'ifb0')
+func SetupTcBase(wgInf, ifbInf string) error {
 	//
 	// 		Add base rule(s) to limit server egress (client download bandwidth)
 	//
@@ -21,7 +24,6 @@ func SetupTcBase(wgInf string) error {
 	// Command analog: 'tc qdisc add dev wgInf root handle 1: htb'
 	wgInfLink, err := netlink.LinkByName(wgInf)
 	if err != nil {
-		fmt.Println("LinkByName error:", err)
 		return err
 	}
 
@@ -135,9 +137,14 @@ func SetupTcBase(wgInf string) error {
 	return nil
 }
 
-func CheckTcBase(wgInf string) error {
-	const ifbInf = "ifb0"
-
+// CheckTcBaseRules checks the existence of the base traffic control rules for the Wireguard interface and IFB interface.
+//
+// - 'wgInf' is the name of the Wireguard interface (e.g. 'wg0')
+//
+// - 'ifbInf' is the name of the IFB interface to be used for ingress shaping (e.g. 'ifb0')
+//
+// Returns an error if any of the required rules are missing or if there is an issue accessing the network interfaces.
+func CheckTcBaseRules(wgInf, ifbInf string) error {
 	// Check creation of WG interface
 	wgInfLink, err := tryLink(wgInf)
 	if err != nil {
@@ -188,6 +195,8 @@ func CheckTcBase(wgInf string) error {
 //
 // - 'wgInf' is the name of the Wireguard interface (e.g. 'wg0')
 //
+// - 'ifbInf' is the name of the IFB interface to be used for ingress shaping (e.g. 'ifb0')
+//
 // - 'peerIp' is the IP address of the peer (e.g. '11.0.0.1')
 //
 // - 'serverNetworkMask' is the subnet mask of the server's network (e.g. '24')
@@ -195,8 +204,7 @@ func CheckTcBase(wgInf string) error {
 // - 'downloadSpeedMb' is the download speed limit for the peer in megabits per second (e.g. 100)
 //
 // - 'uploadSpeedMb' is the upload speed limit for the peer in megabits per second (e.g. 50)
-func ApplyTcForPeer(wgInf string, peerIp net.IP, serverNetworkMask net.IPMask, downloadSpeedMb int, uploadSpeedMb int) error {
-	const ifbInf = "ifb0"
+func ApplyTcForPeer(wgInf, ifbInf string, peerIp net.IP, serverNetworkMask net.IPMask, downloadSpeedMb, uploadSpeedMb int) error {
 	hostNum := hostNumber(peerIp, serverNetworkMask)
 
 	commands := []string{

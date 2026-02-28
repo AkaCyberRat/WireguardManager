@@ -1,10 +1,12 @@
 package network
 
 import (
+	"errors"
 	"fmt"
 	"golang.zx2c4.com/wireguard/wgctrl"
 	"net"
 	"net/netip"
+	"os"
 
 	"github.com/coreos/go-iptables/iptables"
 	"github.com/google/shlex"
@@ -110,8 +112,13 @@ func (s *WgService) SetupWgInterface(infName string, ip net.IP, mask net.IPMask,
 }
 
 // CheckWgInterface checks if a wireguard interface with the given name exists.
+// Returns nil if the interface exists, returns ErrNotExist if not exist, otherwise returns an error.
 func (s *WgService) CheckWgInterface(interfaceName string) error {
 	_, err := s.client.Device(interfaceName)
+	if errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("wireguard interface %s %w", interfaceName, ErrNotExist)
+	}
+
 	return err
 }
 
@@ -150,7 +157,7 @@ func (s *WgService) AddWgPeer(wgInf string, ip net.IP, mask net.IPMask, publicKe
 	return s.client.ConfigureDevice(wgInf, wgtypes.Config{Peers: []wgtypes.PeerConfig{peer}})
 }
 
-// IsWgPeerExists check a peer existence for the wireguard interface with the given parameters.
+// CheckWgPeer check a peer existence for the wireguard interface with the given parameters.
 //
 // - 'wgInf' is the name of wg interface (e.g. 'wg0')
 //
@@ -159,15 +166,12 @@ func (s *WgService) AddWgPeer(wgInf string, ip net.IP, mask net.IPMask, publicKe
 // - 'mask' is the subnet mask of peer (e.g. '32')
 //
 // - 'publicKey' is the public key of peer
-func (s *WgService) IsWgPeerExists(wgInf string, ip net.IP, mask net.IPMask, publicKey string) (bool, error) {
-	pubKey, err := wgtypes.ParseKey(publicKey)
-	if err != nil {
-		return false, err
-	}
-
+//
+// Returns nil if the peer exists, returns ErrNotExist if not exist, otherwise returns an error.
+func (s *WgService) CheckWgPeer(wgInf string, ip net.IP, mask net.IPMask) error {
 	device, err := s.client.Device(wgInf)
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	targetNet := net.IPNet{
@@ -176,20 +180,18 @@ func (s *WgService) IsWgPeerExists(wgInf string, ip net.IP, mask net.IPMask, pub
 	}
 
 	for _, peer := range device.Peers {
-		if peer.PublicKey != pubKey {
-			continue
-		}
-
 		for _, allowed := range peer.AllowedIPs {
 			if allowed.IP.Equal(targetNet.IP) &&
 				net.IP(allowed.Mask).Equal(net.IP(targetNet.Mask)) {
-				return true, nil
+				return nil
 			}
 		}
 	}
 
-	return false, nil
+	return fmt.Errorf("peer %w ( Interface: '%s', Ip: '%v', Mask: '%v' )", ErrNotExist, wgInf, ip, mask)
 }
+
+var ErrNotExist = fmt.Errorf("not exist")
 
 // RemoveWgPeer removes a peer from the wireguard interface with the given parameters.
 //
@@ -243,7 +245,7 @@ func (s *WgService) SetupWgNAT(wgInf string, gwInf string, wgPort int, wgNet net
 	return nil
 }
 
-// CheckWgNat checks ipt (legacy) NAT rules existence.
+// CheckWgNatRules checks ipt (legacy) NAT rules existence.
 //
 // - wgInf is the name of wg interface (e.g. wg0)
 //
@@ -252,7 +254,9 @@ func (s *WgService) SetupWgNAT(wgInf string, gwInf string, wgPort int, wgNet net
 // - wgPort is the port number on which wg server listens (e.g. 51820)
 //
 // - wgNet is the CIDR prefix of wg network (e.g. '11.0.0.0/24')
-func (s *WgService) CheckWgNat(wgInf string, gwInf string, wgPort int, wgNet netip.Prefix) error {
+//
+// Returns nil if all rules exist, returns ErrNotExist if any rule does not exist, otherwise returns an error.
+func (s *WgService) CheckWgNatRules(wgInf string, gwInf string, wgPort int, wgNet netip.Prefix) error {
 	commands := wgNatCommands(wgInf, gwInf, wgPort, wgNet)
 
 	for _, command := range commands {
@@ -267,7 +271,7 @@ func (s *WgService) CheckWgNat(wgInf string, gwInf string, wgPort int, wgNet net
 		}
 
 		if !exists {
-			return fmt.Errorf("NAT rule does not exist: %v", command)
+			return fmt.Errorf("nat rules %w: %v", ErrNotExist, command)
 		}
 	}
 

@@ -42,6 +42,7 @@ func (c Configuration) Validate() error {
 
 const (
 	GwInfName    = "eth0"
+	IfbInfName   = "ifb0"
 	WgInfName    = "wg0"
 	WgServerIp   = "11.0.0.1"
 	WgServerMask = 24
@@ -86,7 +87,7 @@ func main() {
 	logrus.Infof("Tc base enabled")
 
 	// Check TC base rules
-	if err := network.CheckTcBase(WgInfName); err != nil {
+	if err := network.CheckTcBaseRules(WgInfName); err != nil {
 		logrus.Fatal("Failed to check tc base rules existence: ", err)
 	} else {
 		logrus.Infof("Tc base rules exist")
@@ -103,7 +104,7 @@ func main() {
 
 	// Check NAT for wg interface
 
-	if err := wgService.CheckWgNat(WgInfName, GwInfName, port, wgNetPrefix); err != nil {
+	if err := wgService.CheckWgNatRules(WgInfName, GwInfName, port, wgNetPrefix); err != nil {
 		logrus.Fatal("Failed to check NAT rules existence: ", err)
 	}
 	logrus.Infof("Wg nat exists")
@@ -169,11 +170,11 @@ func ValidateOnce(wgService network.WgService, config Configuration) error {
 		return fmt.Errorf("wg interface check failed: %w", err)
 	}
 
-	if err := wgService.CheckWgNat(WgInfName, GwInfName, config.ServerPort, wgNetPrefix); err != nil {
+	if err := wgService.CheckWgNatRules(WgInfName, GwInfName, config.ServerPort, wgNetPrefix); err != nil {
 		return fmt.Errorf("wg nat check failed: %w", err)
 	}
 
-	if err := network.CheckTcBase(WgInfName); err != nil {
+	if err := network.CheckTcBaseRules(WgInfName, IfbInfName); err != nil {
 		return fmt.Errorf("tc validation failed: %w", err)
 	}
 
