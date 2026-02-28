@@ -220,7 +220,7 @@ func ApplyTcForPeer(wgInf, ifbInf string, peerIp net.IP, serverNetworkMask net.I
 
 	classID := netlink.MakeHandle(1, uint16(hostNum))
 	parent := netlink.MakeHandle(1, 1)
-	rate := uint64(downloadSpeedMb) * 1024 * 1024 // mbit → bytes/sec
+	rate := uint64(downloadSpeedMb) * 1000 * 1000 // mbit → bytes/sec
 	ceil := rate
 
 	classAttrs := netlink.ClassAttrs{
