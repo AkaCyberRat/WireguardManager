@@ -87,7 +87,7 @@ func main() {
 	logrus.Infof("Server enabled")
 
 	// Add TC rules and check them
-	tcTool, err := tc.NewTcTool()
+	tcTool, err := tc.NewTool()
 	if err != nil {
 		logrus.Fatal("Failed to create tc tool: ", err)
 	}
@@ -169,7 +169,7 @@ func main() {
 
 }
 
-func StartTimedValidator(ctx context.Context, interval time.Duration, wgService wg.Tool, iptablesTool ipt.IptablesTool, tcTool tc.TcTool, config Configuration) {
+func StartTimedValidator(ctx context.Context, interval time.Duration, wgService wg.Tool, iptablesTool ipt.IptablesTool, tcTool tc.Tool, config Configuration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
@@ -192,7 +192,7 @@ func StartTimedValidator(ctx context.Context, interval time.Duration, wgService 
 	}
 }
 
-func ValidateOnce(wgService wg.Tool, iptablesTool ipt.IptablesTool, tcTool tc.TcTool, config Configuration) error {
+func ValidateOnce(wgService wg.Tool, iptablesTool ipt.IptablesTool, tcTool tc.Tool, config Configuration) error {
 	wgNetPrefix := netip.MustParsePrefix(fmt.Sprintf("%s/%d", WgServerIp, WgServerMask))
 
 	if err := wgService.CheckWgInterface(WgInfName); err != nil {

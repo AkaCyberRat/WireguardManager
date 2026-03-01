@@ -1,32 +1,33 @@
 package tc
 
 import (
-	"WireguardManager/pkg/shell"
 	"errors"
 	"fmt"
 	"net"
+
+	"WireguardManager/pkg/shell"
 
 	"github.com/sirupsen/logrus"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 )
 
-type TcTool struct {
+type Tool struct {
 	handle *netlink.Handle
 }
 
-func NewTcTool() (TcTool, error) {
-	var empty TcTool
+func NewTool() (Tool, error) {
+	var empty Tool
 
 	handle, err := netlink.NewHandle()
 	if err != nil {
 		return empty, err
 	}
 
-	return TcTool{handle: handle}, nil
+	return Tool{handle: handle}, nil
 }
 
-func (t *TcTool) Close() {
+func (t *Tool) Close() {
 	t.handle.Close()
 }
 
@@ -35,7 +36,7 @@ func (t *TcTool) Close() {
 // - 'wgInf' is the name of the Wireguard interface (e.g. 'wg0')
 //
 // - 'ifbInf' is the name of the IFB interface to be used for ingress shaping (e.g. 'ifb0')
-func (t *TcTool) SetupTcBase(wgInf, ifbInf string) error {
+func (t *Tool) SetupTcBase(wgInf, ifbInf string) error {
 	//
 	// 		Add base rule(s) to limit server egress (client download bandwidth)
 	//
@@ -164,7 +165,7 @@ func (t *TcTool) SetupTcBase(wgInf, ifbInf string) error {
 // - 'ifbInf' is the name of the IFB interface to be used for ingress shaping (e.g. 'ifb0')
 //
 // Returns an error if any of the required rules are missing or if there is an issue accessing the network interfaces.
-func (t *TcTool) CheckTcBaseRules(wgInf, ifbInf string) error {
+func (t *Tool) CheckTcBaseRules(wgInf, ifbInf string) error {
 	// Check creation of WG interface
 	wgInfLink, err := t.tryLink(wgInf)
 	if err != nil {
@@ -227,7 +228,7 @@ type TcPeerParams struct {
 
 // ApplyTcForPeer applies traffic control rules for a peer with the given IP address, download speed, and upload speed.
 // It calculates the host number based on the peer's IP and the server's network mask, and then uses that host number to create unique tc rules for that peer.
-func (t *TcTool) ApplyTcForPeer(params TcPeerParams) error {
+func (t *Tool) ApplyTcForPeer(params TcPeerParams) error {
 	hostNum := hostNumber(params.PeerIp, params.ServerNetworkMask)
 
 	//
@@ -292,7 +293,7 @@ func (t *TcTool) ApplyTcForPeer(params TcPeerParams) error {
 	return nil
 }
 
-func (t *TcTool) CheckTcPeerRules(params TcPeerParams) error {
+func (t *Tool) CheckTcPeerRules(params TcPeerParams) error {
 	//Check htb class for peer with specified download speed
 	hostNum := hostNumber(params.PeerIp, params.ServerNetworkMask)
 
@@ -348,7 +349,7 @@ func DiscardTcForPeer(params TcPeerParams) error {
 	return nil
 }
 
-func (t *TcTool) tryLink(name string) (netlink.Link, error) {
+func (t *Tool) tryLink(name string) (netlink.Link, error) {
 	link, err := t.handle.LinkByName(name)
 	if err != nil {
 		if errors.As(err, new(netlink.LinkNotFoundError)) {
@@ -359,7 +360,7 @@ func (t *TcTool) tryLink(name string) (netlink.Link, error) {
 	return link, nil
 }
 
-func (t *TcTool) hasQdisc(link netlink.Link, handle, parent uint32) error {
+func (t *Tool) hasQdisc(link netlink.Link, handle, parent uint32) error {
 	qdiscs, err := t.handle.QdiscList(link)
 	if err != nil {
 		return err
@@ -374,7 +375,7 @@ func (t *TcTool) hasQdisc(link netlink.Link, handle, parent uint32) error {
 	return fmt.Errorf("qdisc not found ( Interface: '%s', Handle: '%v', Parent: '%v' )", link.Attrs().Name, handle, parent)
 }
 
-func (t *TcTool) hasClass(link netlink.Link, handle, parent uint32) error {
+func (t *Tool) hasClass(link netlink.Link, handle, parent uint32) error {
 	classes, err := t.handle.ClassList(link, parent)
 	if err != nil {
 		return err
@@ -388,7 +389,7 @@ func (t *TcTool) hasClass(link netlink.Link, handle, parent uint32) error {
 	return fmt.Errorf("class not found ( Interface: '%s', Handle: '%v', Parent: '%v' )", link.Attrs().Name, handle, parent)
 }
 
-func (t *TcTool) hasU32EgressRedirectFilter(link netlink.Link, parent uint32) error {
+func (t *Tool) hasU32EgressRedirectFilter(link netlink.Link, parent uint32) error {
 	filters, err := t.handle.FilterList(link, parent)
 	if err != nil {
 		return err
