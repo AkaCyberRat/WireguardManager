@@ -75,3 +75,11 @@ Avaliable API interfaces:
 - Build it yourself from the source code (it is not recommended to run on a host without a container, because the application does not take into account existing Wireguard interfaces, and also does not take into account their current state, which can cause errors). You can use [Makefile](Makefile).
   > Before launch yourself build, it is very important to configure the communication of network interfaces. You need to configure traffic forwarding between Wireguard interface and main network interface (usually eth0) so that peers could have access to the external network from your host. I use the CoreDNS utility to [configure forwarding](deploy/).
   Thanks to [Mawthuq-Software](https://github.com/Mawthuq-Software/), the solution and some other from [his project for Wireguard](https://github.com/Mawthuq-Software/Wireguard-Manager-and-API). Also you need to install additional packages on the host, you can see in the [Dockerfile](deploy/Dockerfile).
+
+
+
+## How to dev it?
+
+- Clone repository
+- Set default build tag 'linux' for the project in your IDE 
+- Write code
