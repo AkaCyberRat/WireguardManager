@@ -3,11 +3,10 @@ package services
 import (
 	"WireguardManager/internal/config"
 	"WireguardManager/internal/repositories"
-	"WireguardManager/internal/tools/network"
 )
 
 type Deps struct {
-	NetTool          network.NetworkTool
+	// NetTool          network.NetworkTool
 	PeerRepository   repositories.PeerRepository
 	ServerRepository repositories.ServerRepository
 	Config           config.Configuration_
@@ -23,14 +22,14 @@ type Services struct {
 func NewServices(deps Deps) Services {
 
 	syncService := NewSyncService()
-	recoverService := NewRecoverService(deps.PeerRepository, deps.ServerRepository, deps.NetTool)
-	peerService := NewPeerService(deps.ServerRepository, deps.PeerRepository, deps.NetTool, syncService)
+	recoverService := NewRecoverService(deps.PeerRepository, deps.ServerRepository)
+	peerService := NewPeerService(deps.ServerRepository, deps.PeerRepository, syncService)
 	serverService := NewServerService(ServerDeps{
 		ServerRepository: deps.ServerRepository,
 		SyncService:      syncService,
 		RecoverService:   recoverService,
-		NetTool:          deps.NetTool,
-		Config:           deps.Config,
+		// NetTool:          deps.NetTool,
+		Config: deps.Config,
 	})
 
 	services := Services{

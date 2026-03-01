@@ -11,7 +11,6 @@ import (
 	"WireguardManager/internal/repositories/sqlite"
 	"WireguardManager/internal/services"
 	"WireguardManager/internal/tools/auth"
-	"WireguardManager/internal/tools/network"
 	"WireguardManager/internal/transport/rest"
 	"WireguardManager/internal/transport/rest/handlers"
 
@@ -64,11 +63,11 @@ func main() {
 	repositories := sqlite.NewRepositories(db)
 
 	// Create NetworkTool for driving Wireguard interface and TrafficControl tool
-	netTool := network.NewNetworkTool(conf.Wireguard.Port)
+	// netTool := network.NewNetworkTool(conf.Wireguard.Port)
 
 	// Create services
 	services := services.NewServices(services.Deps{
-		NetTool:          netTool,
+		// NetTool:          netTool,
 		PeerRepository:   repositories.PeerRepository,
 		ServerRepository: repositories.ServerRepository,
 		Config:           *conf,
@@ -94,7 +93,7 @@ func main() {
 
 	// Init repositories
 	if err = repositories.Init(sqlite.InitDeps{
-		NetTool:          netTool,
+		// NetTool:          netTool,
 		WireguardPort:    conf.Wireguard.Port,
 		WireguardEnabled: true,
 		PeerCount:        conf.Wireguard.PeerLimit,

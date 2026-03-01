@@ -6,7 +6,6 @@ import (
 
 	"WireguardManager/internal/core"
 	"WireguardManager/internal/repositories"
-	"WireguardManager/internal/tools/network"
 
 	"github.com/sirupsen/logrus"
 )
@@ -23,15 +22,15 @@ type Peer struct {
 	syncService SyncService
 	serverRepos repositories.ServerRepository
 	peerRepos   repositories.PeerRepository
-	netTool     network.NetworkTool
+	// netTool     network.NetworkTool
 }
 
-func NewPeerService(serverRepository repositories.ServerRepository, peerRep repositories.PeerRepository, netTool network.NetworkTool, syncService SyncService) *Peer {
+func NewPeerService(serverRepository repositories.ServerRepository, peerRep repositories.PeerRepository, syncService SyncService) *Peer {
 	return &Peer{
 		serverRepos: serverRepository,
 		syncService: syncService,
 		peerRepos:   peerRep,
-		netTool:     netTool,
+		// netTool:     netTool,
 	}
 }
 
@@ -109,10 +108,10 @@ func (s *Peer) Create(ctx context.Context, model *core.CreatePeer) (*core.Respon
 			}
 
 			if peer.Status == core.Enabled && server.Enabled {
-				err = s.netTool.EnablePeer(peer)
-				if err != nil {
-					return err
-				}
+				// err = s.netTool.EnablePeer(peer)
+				// if err != nil {
+				// 	return err
+				// }
 			}
 
 			_, err = s.peerRepos.Update(peer)
@@ -184,17 +183,17 @@ func (s *Peer) Update(ctx context.Context, model *core.UpdatePeer) (*core.Respon
 
 			if server.Enabled {
 				if lastStatus == core.Enabled {
-					err = s.netTool.DisablePeer(peer)
-					if err != nil {
-						return err
-					}
+					// err = s.netTool.DisablePeer(peer)
+					// if err != nil {
+					// 	return err
+					// }
 				}
 
 				if peer.Status == core.Enabled {
-					err = s.netTool.EnablePeer(peer)
-					if err != nil {
-						return err
-					}
+					// err = s.netTool.EnablePeer(peer)
+					// if err != nil {
+					// 	return err
+					// }
 				}
 			}
 
@@ -244,10 +243,10 @@ func (s *Peer) Delete(ctx context.Context, model *core.DeletePeer) error {
 			}
 
 			if peer.Status == core.Enabled && server.Enabled {
-				err = s.netTool.DisablePeer(peer)
-				if err != nil {
-					return err
-				}
+				// err = s.netTool.DisablePeer(peer)
+				// if err != nil {
+				// 	return err
+				// }
 			}
 
 			rewritedPeer := core.Peer{}

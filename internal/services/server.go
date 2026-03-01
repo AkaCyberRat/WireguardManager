@@ -6,7 +6,7 @@ import (
 	"WireguardManager/internal/config"
 	"WireguardManager/internal/core"
 	"WireguardManager/internal/repositories"
-	"WireguardManager/internal/tools/network"
+
 	"github.com/sirupsen/logrus"
 )
 
@@ -21,16 +21,16 @@ type Server struct {
 	syncService    SyncService
 	recoverService RecoverService
 	serverRepos    repositories.ServerRepository
-	netTool        network.NetworkTool
-	config         config.Configuration_
+	// netTool        network.NetworkTool
+	config config.Configuration_
 }
 
 type ServerDeps struct {
 	ServerRepository repositories.ServerRepository
 	SyncService      SyncService
 	RecoverService   RecoverService
-	NetTool          network.NetworkTool
-	Config           config.Configuration_
+	// NetTool          network.NetworkTool
+	Config config.Configuration_
 }
 
 func NewServerService(deps ServerDeps) *Server {
@@ -38,8 +38,8 @@ func NewServerService(deps ServerDeps) *Server {
 		serverRepos:    deps.ServerRepository,
 		syncService:    deps.SyncService,
 		recoverService: deps.RecoverService,
-		netTool:        deps.NetTool,
-		config:         deps.Config,
+		// netTool:        deps.NetTool,
+		config: deps.Config,
 	}
 }
 
@@ -82,13 +82,13 @@ func (s *Server) Update(ctx context.Context, model *core.UpdateServer) (*core.Re
 		}
 
 		if model.PrivateKey != nil {
-			publicKey, err := network.GeneratePublicKey(*model.PrivateKey)
-			if err != nil {
-				return err
-			}
+			// publicKey, err := network.GeneratePublicKey(*model.PrivateKey)
+			// if err != nil {
+			// 	return err
+			// }
 
-			server.PrivateKey = *model.PrivateKey
-			server.PublicKey = publicKey
+			// server.PrivateKey = *model.PrivateKey
+			// server.PublicKey = publicKey
 		}
 
 		wasEnabled = server.Enabled
@@ -97,19 +97,19 @@ func (s *Server) Update(ctx context.Context, model *core.UpdateServer) (*core.Re
 		}
 
 		if wasEnabled {
-			if err = s.netTool.DisableServer(); err != nil {
-				return err
-			}
+			// if err = s.netTool.DisableServer(); err != nil {
+			// 	return err
+			// }
 		}
 
 		if server.Enabled {
-			if err = s.netTool.EnableServer(server); err != nil {
-				return err
-			}
+			// if err = s.netTool.EnableServer(server); err != nil {
+			// 	return err
+			// }
 
-			if err = s.recoverService.RecoverPeers(); err != nil {
-				return err
-			}
+			// if err = s.recoverService.RecoverPeers(); err != nil {
+			// 	return err
+			// }
 		}
 
 		_, err = s.serverRepos.Save(server)

@@ -3,7 +3,6 @@ package sqlite
 import (
 	"WireguardManager/internal/core"
 	"WireguardManager/internal/repositories/sqlite/models"
-	"WireguardManager/internal/tools/network"
 	"fmt"
 
 	"gorm.io/gorm"
@@ -26,7 +25,7 @@ func NewRepositories(db *gorm.DB) *Repositories {
 }
 
 type InitDeps struct {
-	NetTool network.NetworkTool
+	// NetTool network.NetworkTool
 
 	WireguardPrivateKey string
 	WireguardPort       int
@@ -42,7 +41,7 @@ func (r *Repositories) Init(deps InitDeps) error {
 			return err
 		}
 
-		if err := r.initServer(deps.NetTool, deps.WireguardPrivateKey, deps.WireguardPort, deps.WireguardEnabled); err != nil {
+		if err := r.initServer(deps.WireguardPrivateKey, deps.WireguardPort, deps.WireguardEnabled); err != nil {
 			return err
 		}
 	}
@@ -70,22 +69,22 @@ func (r *Repositories) initPeers(count int) error {
 	return nil
 }
 
-func (r *Repositories) initServer(netTool network.NetworkTool, privateKey string, port int, enabled bool) error {
+func (r *Repositories) initServer(privateKey string, port int, enabled bool) error {
 	var err error
 
 	if privateKey == "" {
-		if privateKey, err = network.GeneratePrivateKey(); err != nil {
-			return err
-		}
+		// if privateKey, err = network.GeneratePrivateKey(); err != nil {
+		// 	return err
+		// }
 	}
 
-	publicKey, err := network.GeneratePublicKey(privateKey)
-	if err != nil {
-		return err
-	}
+	// publicKey, err := network.GeneratePublicKey(privateKey)
+	// if err != nil {
+	// 	return err
+	// }
 
 	server := core.Server{
-		PublicKey:  publicKey,
+		PublicKey:  "publicKey",
 		PrivateKey: privateKey,
 		Enabled:    enabled,
 	}

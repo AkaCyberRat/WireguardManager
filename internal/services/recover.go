@@ -3,7 +3,6 @@ package services
 import (
 	"WireguardManager/internal/core"
 	"WireguardManager/internal/repositories"
-	"WireguardManager/internal/tools/network"
 
 	"github.com/sirupsen/logrus"
 )
@@ -17,14 +16,14 @@ type RecoverService interface {
 type Recover struct {
 	peerRepos   repositories.PeerRepository
 	serverRepos repositories.ServerRepository
-	netTool     network.NetworkTool
+	// netTool     network.NetworkTool
 }
 
-func NewRecoverService(peerRepos repositories.PeerRepository, serverRepos repositories.ServerRepository, netTool network.NetworkTool) RecoverService {
+func NewRecoverService(peerRepos repositories.PeerRepository, serverRepos repositories.ServerRepository) RecoverService {
 	return &Recover{
 		peerRepos:   peerRepos,
 		serverRepos: serverRepos,
-		netTool:     netTool,
+		// netTool:     netTool,
 	}
 }
 
@@ -35,9 +34,9 @@ func (r *Recover) RecoverServer() error {
 	}
 
 	if server.Enabled {
-		if err = r.netTool.EnableServer(server); err != nil {
-			return err
-		}
+		// if err = r.netTool.EnableServer(server); err != nil {
+		// 	return err
+		// }
 	}
 
 	logrus.Infof("Recover service recover server complete.")
@@ -52,9 +51,9 @@ func (r *Recover) RecoverPeers() error {
 
 	for _, peer := range peers {
 		if peer.Status == core.Enabled {
-			if err = r.netTool.EnablePeer(peer); err != nil {
-				return err
-			}
+			// if err = r.netTool.EnablePeer(peer); err != nil {
+			// 	return err
+			// }
 		}
 	}
 
