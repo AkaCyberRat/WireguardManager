@@ -51,9 +51,9 @@ func main() {
 
 	// Setup Wg interface
 
-	wgService, err := wg.NewWgService()
+	wgService, err := wg.NewWgTool()
 	if err != nil {
-		logrus.Fatal("Failed to create WgService: ", err.Error())
+		logrus.Fatal("Failed to create Tool: ", err.Error())
 	}
 
 	wgServerIp := net.ParseIP(WgServerIp)
@@ -61,7 +61,7 @@ func main() {
 	serverPrivateKey := conf.ServerPrivateKey
 	port := conf.ServerPort
 
-	if err := wgService.SetupWgInterface(WgInfName, wgServerIp, wgServerMask, serverPrivateKey, port); err != nil {
+	if err := wgService.AddWgInterface(WgInfName, wgServerIp, wgServerMask, serverPrivateKey, port); err != nil {
 		logrus.Fatal("Failed to setup Wg interface: ", err.Error())
 	}
 	logrus.Infof("Server enabled")

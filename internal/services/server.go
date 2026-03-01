@@ -7,10 +7,10 @@ import (
 	"WireguardManager/internal/core"
 	"WireguardManager/internal/repositories"
 	"WireguardManager/internal/tools/network"
-	"WireguardManager/internal/tools/wg"
-
 	"github.com/sirupsen/logrus"
 )
+
+const WgIp = "11.0.0.1"
 
 type ServerService interface {
 	Get(ctx context.Context) (*core.ResponseServer, error)
@@ -55,7 +55,7 @@ func (s *Server) Get(ctx context.Context) (*core.ResponseServer, error) {
 
 	response := core.ResponseServer{
 		HostIp:    s.config.Host.Ip,
-		DnsIp:     wg.WgIp,
+		DnsIp:     WgIp,
 		PublicKey: server.PublicKey,
 		Port:      s.config.Wireguard.Port,
 		Enabled:   server.Enabled,
@@ -121,7 +121,7 @@ func (s *Server) Update(ctx context.Context, model *core.UpdateServer) (*core.Re
 
 	response := core.ResponseServer{
 		HostIp:    s.config.Host.Ip,
-		DnsIp:     wg.WgIp,
+		DnsIp:     WgIp,
 		PublicKey: server.PublicKey,
 		Port:      s.config.Wireguard.Port,
 		Enabled:   server.Enabled,

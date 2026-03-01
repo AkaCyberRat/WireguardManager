@@ -71,9 +71,9 @@ func main() {
 
 	// Setup Wg interface
 
-	wgService, err := wg.NewWgService()
+	wgService, err := wg.NewWgTool()
 	if err != nil {
-		logrus.Fatal("Failed to create WgService: ", err.Error())
+		logrus.Fatal("Failed to create Tool: ", err.Error())
 	}
 
 	wgServerIp := net.ParseIP(WgServerIp)
@@ -81,7 +81,7 @@ func main() {
 	serverPrivateKey := conf.ServerPrivateKey
 	port := conf.ServerPort
 
-	if err := wgService.SetupWgInterface(WgInfName, wgServerIp, wgServerMask, serverPrivateKey, port); err != nil {
+	if err := wgService.AddWgInterface(WgInfName, wgServerIp, wgServerMask, serverPrivateKey, port); err != nil {
 		logrus.Fatal("Failed to setup Wg interface: ", err.Error())
 	}
 	logrus.Infof("Server enabled")
@@ -169,7 +169,7 @@ func main() {
 
 }
 
-func StartTimedValidator(ctx context.Context, interval time.Duration, wgService wg.WgService, iptablesTool ipt.IptablesTool, tcTool tc.TcTool, config Configuration) {
+func StartTimedValidator(ctx context.Context, interval time.Duration, wgService wg.Tool, iptablesTool ipt.IptablesTool, tcTool tc.TcTool, config Configuration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
@@ -192,7 +192,7 @@ func StartTimedValidator(ctx context.Context, interval time.Duration, wgService 
 	}
 }
 
-func ValidateOnce(wgService wg.WgService, iptablesTool ipt.IptablesTool, tcTool tc.TcTool, config Configuration) error {
+func ValidateOnce(wgService wg.Tool, iptablesTool ipt.IptablesTool, tcTool tc.TcTool, config Configuration) error {
 	wgNetPrefix := netip.MustParsePrefix(fmt.Sprintf("%s/%d", WgServerIp, WgServerMask))
 
 	if err := wgService.CheckWgInterface(WgInfName); err != nil {

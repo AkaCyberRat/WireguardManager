@@ -6,43 +6,41 @@ import (
 	"net"
 	"os"
 
-	"golang.zx2c4.com/wireguard/wgctrl"
+	"WireguardManager/internal/tools"
 
 	"github.com/vishvananda/netlink"
+	"golang.zx2c4.com/wireguard/wgctrl"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
-const (
-	WgIpNet = "11.0.0.1/24"
-	WgIp    = "11.0.0.1"
-)
-
-type WgService struct {
+type Tool struct {
 	client *wgctrl.Client
 }
 
-func NewWgService() (WgService, error) {
-	var empty WgService
-
+func NewWgTool() (Tool, error) {
 	client, err := wgctrl.New()
 	if err != nil {
-		return empty, err
+		return Tool{}, err
 	}
 
-	return WgService{client: client}, nil
+	return Tool{client: client}, nil
 }
 
-// SetupWgInterface creates and configures a wireguard interface with the given parameters.
-// - 'infName' is the name of wg interface (e.g. 'wg0')
-//
-// - 'ip' is the IP address of wg interface (e.g. '11.0.0.1')
-//
-// - 'mask' is the subnet mask of wg interface (e.g. '24')
-//
-// - 'privateKey' is the private key of wg server
-//
-// - 'port' is the port number on which wg server listens (e.g. 51820)
-func (s *WgService) SetupWgInterface(infName string, ip net.IP, mask net.IPMask, privateKey string, port int) error {
+type ServerParams struct {
+	// InfName is the name of wg interface (e.g. 'wg0')
+	InfName string
+	// Ip is the IP address of wg interface (e.g. '11.0.0.1')
+	Ip net.IP
+	// Mask is the subnet mask of wg interface (e.g. '24')
+	Mask net.IPMask
+	// PrivateKey is the private key of wg server
+	PrivateKey string
+	// Port is the port number on which wg server listens (e.g. 51820)
+	Port int
+}
+
+// AddWgInterface creates and configures a wireguard interface with the given parameters.
+func (t *Tool) AddWgInterface(params ServerParams) error {
 	const WgLinkType = "wireguard"
 	const WgLinkMTU = 1420
 	const WgLinkTxQLen = 1000
@@ -54,7 +52,7 @@ func (s *WgService) SetupWgInterface(infName string, ip net.IP, mask net.IPMask,
 	defer handle.Close()
 
 	linkAttrs := netlink.NewLinkAttrs()
-	linkAttrs.Name = infName
+	linkAttrs.Name = params.InfName
 	linkAttrs.MTU = WgLinkMTU
 	linkAttrs.TxQLen = WgLinkTxQLen
 
@@ -66,33 +64,33 @@ func (s *WgService) SetupWgInterface(infName string, ip net.IP, mask net.IPMask,
 		return err
 	}
 
-	pk, err := wgtypes.ParseKey(privateKey)
+	pk, err := wgtypes.ParseKey(params.PrivateKey)
 	if err != nil {
 		return err
 	}
 
 	config := wgtypes.Config{
 		PrivateKey:   &pk,
-		ListenPort:   &port,
+		ListenPort:   &params.Port,
 		ReplacePeers: true,
 		Peers:        make([]wgtypes.PeerConfig, 0),
 	}
 
-	link, err := handle.LinkByName(infName)
+	link, err := handle.LinkByName(params.InfName)
 	if err != nil {
 		return err
 	}
 
 	if err = handle.AddrAdd(link, &netlink.Addr{
 		IPNet: &net.IPNet{
-			IP:   ip,
-			Mask: mask,
+			IP:   params.Ip,
+			Mask: params.Mask,
 		},
 	}); err != nil {
 		return err
 	}
 
-	if err = s.client.ConfigureDevice(infName, config); err != nil {
+	if err = t.client.ConfigureDevice(params.InfName, config); err != nil {
 		return err
 	}
 
@@ -105,70 +103,66 @@ func (s *WgService) SetupWgInterface(infName string, ip net.IP, mask net.IPMask,
 
 // CheckWgInterface checks if a wireguard interface with the given name exists.
 // Returns nil if the interface exists, returns ErrNotExist if not exist, otherwise returns an error.
-func (s *WgService) CheckWgInterface(interfaceName string) error {
-	_, err := s.client.Device(interfaceName)
+func (t *Tool) CheckWgInterface(params ServerParams) error {
+	_, err := t.client.Device(params.InfName)
 	if errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("wireguard interface %s %w", interfaceName, ErrNotExist)
+		return fmt.Errorf("wireguard interface %t %w", params.InfName, tools.ErrNotExist)
 	}
 
 	return err
 }
 
+type PeerParams struct {
+	// InfName is the name of wg interface (e.g. 'wg0')
+	InfName string
+	// Ip is the IP address of peer (e.g. '11.0.0.2')
+	Ip net.IP
+	// Mask is the subnet mask of peer (e.g. '32')
+	Mask net.IPMask
+	// PublicKey is the public key of peer
+	PublicKey string
+	// PreSharedKey is the pre-shared key of peer (optional)
+	PreSharedKey *string
+}
+
 // AddWgPeer adds a peer to the wireguard interface with the given parameters.
-//
-// - 'wgInf' is the name of wg interface (e.g. 'wg0')
-//
-// - 'ip' is the IP address of peer (e.g. '11.0.0.2')
-//
-// - 'mask' is the subnet mask of peer (e.g. '32')
-//
-// - 'publicKey' is the public key of peer
-//
-// - 'preSharedKey' is the pre-shared key of peer (optional)
-func (s *WgService) AddWgPeer(wgInf string, ip net.IP, mask net.IPMask, publicKey string, preSharedKey *string) error {
-	pubKey, err := wgtypes.ParseKey(publicKey)
+func (t *Tool) AddWgPeer(params PeerParams) error {
+	pubKey, err := wgtypes.ParseKey(params.PublicKey)
 	if err != nil {
 		return err
 	}
 
-	peerIpNet := []net.IPNet{{IP: ip, Mask: mask}}
+	peerIpNet := []net.IPNet{{IP: params.Ip, Mask: params.Mask}}
 
 	peer := wgtypes.PeerConfig{
 		PublicKey:  pubKey,
 		AllowedIPs: peerIpNet,
 	}
 
-	if preSharedKey != nil {
-		preKey, err := wgtypes.ParseKey(*preSharedKey)
+	if params.PreSharedKey != nil {
+		preKey, err := wgtypes.ParseKey(*params.PreSharedKey)
 		if err != nil {
 			return err
 		}
 		peer.PresharedKey = &preKey
 	}
 
-	return s.client.ConfigureDevice(wgInf, wgtypes.Config{Peers: []wgtypes.PeerConfig{peer}})
+	return t.client.ConfigureDevice(params.InfName, wgtypes.Config{Peers: []wgtypes.PeerConfig{peer}})
 }
 
+type CheckPeerParams PeerParams
+
 // CheckWgPeer check a peer existence for the wireguard interface with the given parameters.
-//
-// - 'wgInf' is the name of wg interface (e.g. 'wg0')
-//
-// - 'ip' is the IP address of peer (e.g. '11.0.0.2')
-//
-// - 'mask' is the subnet mask of peer (e.g. '32')
-//
-// - 'publicKey' is the public key of peer
-//
 // Returns nil if the peer exists, returns ErrNotExist if not exist, otherwise returns an error.
-func (s *WgService) CheckWgPeer(wgInf string, ip net.IP, mask net.IPMask) error {
-	device, err := s.client.Device(wgInf)
+func (t *Tool) CheckWgPeer(params CheckPeerParams) error {
+	device, err := t.client.Device(params.InfName)
 	if err != nil {
 		return err
 	}
 
 	targetNet := net.IPNet{
-		IP:   ip,
-		Mask: mask,
+		IP:   params.Ip,
+		Mask: params.Mask,
 	}
 
 	for _, peer := range device.Peers {
@@ -180,35 +174,28 @@ func (s *WgService) CheckWgPeer(wgInf string, ip net.IP, mask net.IPMask) error 
 		}
 	}
 
-	return fmt.Errorf("peer %w ( Interface: '%s', Ip: '%v', Mask: '%v' )", ErrNotExist, wgInf, ip, mask)
+	return fmt.Errorf("peer %w ( Interface: '%s', Ip: '%v', Mask: '%v' )", tools.ErrNotExist, params.InfName, params.Ip, params.Mask)
 }
 
-var ErrNotExist = fmt.Errorf("not exist")
+type RemovePeerParams struct {
+	// InfName is the name of wg interface (e.g. 'wg0')
+	InfName string
+	// Ip is the IP address of peer (e.g. '11.0.0.2')
+	Ip net.IP
+	// Mask is the subnet mask of peer (e.g. '32')
+	Mask net.IPMask
+}
 
 // RemoveWgPeer removes a peer from the wireguard interface with the given parameters.
-//
-// - 'wgInf' is the name of wg interface (e.g. 'wg0')
-//
-// - 'ip' is the IP address of peer (e.g. '11.0.0.2')
-//
-// - 'mask' is the subnet mask of peer (e.g. '32')
-//
-// - 'publicKey' is the public key of peer
-func (s *WgService) RemoveWgPeer(wgInf string, ip net.IP, mask net.IPMask, publicKey string) error {
-	pubKey, err := wgtypes.ParseKey(publicKey)
-	if err != nil {
-		return err
-	}
-
-	peerIpNet := []net.IPNet{{IP: ip, Mask: mask}}
+func (t *Tool) RemoveWgPeer(params RemovePeerParams) error {
+	peerIpNet := []net.IPNet{{IP: params.Ip, Mask: params.Mask}}
 
 	peer := wgtypes.PeerConfig{
-		PublicKey:  pubKey,
 		AllowedIPs: peerIpNet,
 		Remove:     true,
 	}
 
-	return s.client.ConfigureDevice(wgInf, wgtypes.Config{Peers: []wgtypes.PeerConfig{peer}})
+	return t.client.ConfigureDevice(params.InfName, wgtypes.Config{Peers: []wgtypes.PeerConfig{peer}})
 }
 
 func GeneratePrivateKey() (string, error) {
