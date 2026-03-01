@@ -66,101 +66,87 @@ func main() {
 	}
 
 	//
-	// 		Server actions
+	// Make tools
 	//
-
-	// Setup Wg interface
-
-	wgService, err := wg.NewWgTool()
+	wgTool, err := wg.NewTool()
 	if err != nil {
-		logrus.Fatal("Failed to create Tool: ", err.Error())
+		logrus.Fatal("Failed to create wg tool: ", err)
 	}
 
-	wgServerIp := net.ParseIP(WgServerIp)
-	wgServerMask := net.CIDRMask(WgServerMask, 32)
-	serverPrivateKey := conf.ServerPrivateKey
-	port := conf.ServerPort
-
-	if err := wgService.AddWgInterface(WgInfName, wgServerIp, wgServerMask, serverPrivateKey, port); err != nil {
-		logrus.Fatal("Failed to setup Wg interface: ", err.Error())
+	iptablesTool, err := ipt.NewTool()
+	if err != nil {
+		logrus.Fatal("Failed to create iptables tool: ", err)
 	}
-	logrus.Infof("Server enabled")
 
-	// Add TC rules and check them
 	tcTool, err := tc.NewTool()
 	if err != nil {
 		logrus.Fatal("Failed to create tc tool: ", err)
 	}
 
+	//
+	// 		Server actions
+	//
+
+	if err := wgTool.AddWgInterface(wg.ServerParams{
+		InfName:    WgInfName,
+		Ip:         net.ParseIP(WgServerIp),
+		Mask:       net.CIDRMask(WgPeerMask, 32),
+		PrivateKey: conf.ServerPrivateKey,
+		Port:       conf.ServerPort,
+	}); err != nil {
+		logrus.Fatal("Failed to add wg interface: ", err.Error())
+	}
+
+	logrus.Infof("Wg interface enabled")
+
 	if err := tcTool.SetupTcBase(WgInfName, IfbInfName); err != nil {
-		logrus.Fatal("Failed to setup tc base: ", err.Error())
-	}
-	logrus.Infof("Tc base enabled")
-
-	if err := tcTool.CheckTcBaseRules(WgInfName, IfbInfName); err != nil {
-		logrus.Fatal("Failed to check tc base rules existence: ", err)
-	} else {
-		logrus.Infof("Tc base rules exist")
+		logrus.Fatal("Failed to add tc base: ", err.Error())
 	}
 
-	// Add NAT rules and check them
-	iptablesTool, err := ipt.NewIptablesTool()
-	if err != nil {
-		logrus.Fatal("Failed to create iptables tool: ", err)
-	}
+	logrus.Infof("Tc base rules enabled")
 
-	wgNetPrefix := netip.MustParsePrefix(fmt.Sprintf("%s/%d", WgServerIp, WgServerMask))
-	wgNetParams := ipt.WgNatParams{
+	if err := iptablesTool.AddWgNatRules(ipt.NatParams{
 		WgInf:  WgInfName,
 		GwInf:  GwInfName,
-		WgPort: port,
-		WgNet:  wgNetPrefix,
+		WgPort: conf.ServerPort,
+		WgNet:  netip.MustParsePrefix(fmt.Sprintf("%s/%d", WgServerIp, WgServerMask)),
+	}); err != nil {
+		logrus.Fatal("Failed to add wg nat rules: ", err)
 	}
-
-	if err := iptablesTool.AddWgNatRules(wgNetParams); err != nil {
-		logrus.Fatal("Failed to add wg NAT rules: ", err)
-	}
-	logrus.Infof("NAT enabled")
-
-	if err := iptablesTool.CheckWgNatRules(wgNetParams); err != nil {
-		logrus.Fatal("Failed to check wg NAT rules: ", err)
-	}
-	logrus.Infof("Wg nat exists")
+	logrus.Infof("Nat rules enabled")
 
 	//
 	// 		Peer actions
 	//
 
-	wgPeerMask := net.CIDRMask(WgPeerMask, 32)
-	peerPublicKey := conf.PeerPublicKey
-
 	for i, peer := range conf.Peers {
-		// Setup Wg peer
-
-		wgPeerIp := net.ParseIP(peer.Ip)
-
-		if err := wgService.AddWgPeer(WgInfName, wgPeerIp, wgPeerMask, peerPublicKey, nil); err != nil {
-			logrus.Fatal("Failed to add Wg peer: ", err.Error())
+		if err := wgTool.AddWgPeer(wg.PeerParams{
+			InfName:   WgInfName,
+			Ip:        net.ParseIP(peer.Ip),
+			Mask:      net.CIDRMask(WgPeerMask, 32),
+			PublicKey: conf.PeerPublicKey,
+		}); err != nil {
+			logrus.Fatal("Failed to add wg peer: ", err.Error())
 		}
-		logrus.Infof("Peer %d enabled", i)
 
-		// Setup Tc for peer
+		logrus.Infof("Wg peer %d enabled", i)
 
-		if err := tcTool.ApplyTcForPeer(tc.TcPeerParams{
+		if err := tcTool.ApplyTcForPeer(tc.PeerParams{
 			WgInf:             WgInfName,
 			IfbInf:            IfbInfName,
-			PeerIp:            wgPeerIp,
-			ServerNetworkMask: wgServerMask,
+			PeerIp:            net.ParseIP(peer.Ip),
+			ServerNetworkMask: net.CIDRMask(WgServerMask, 32),
 			DownloadSpeedMb:   peer.Speed,
 			UploadSpeedMb:     peer.Speed,
 		}); err != nil {
-			logrus.Fatal("Failed to apply tc rules for peer: ", err.Error())
+			logrus.Fatal("Failed to add tc rules for peer: ", err.Error())
 		}
+
 		logrus.Infof("Tc rules for peer %d enabled", i)
 
 	}
 
-	go StartTimedValidator(context.Background(), 30*time.Second, wgService, iptablesTool, tcTool, conf)
+	go StartTimedValidator(context.Background(), 30*time.Second, wgTool, iptablesTool, tcTool, conf)
 
 	// Wait for exit  signal
 	waitForExitSignal()
@@ -177,7 +163,7 @@ func StartTimedValidator(ctx context.Context, interval time.Duration, wgService 
 		select {
 		case <-ticker.C:
 			startTime := time.Now()
-			err := ValidateOnce(wgService, iptablesTool, tcTool, config)
+			err := Validate(wgService, iptablesTool, tcTool, config)
 			duration := time.Since(startTime)
 
 			if err != nil {
@@ -192,14 +178,20 @@ func StartTimedValidator(ctx context.Context, interval time.Duration, wgService 
 	}
 }
 
-func ValidateOnce(wgService wg.Tool, iptablesTool ipt.IptablesTool, tcTool tc.Tool, config Configuration) error {
+func Validate(wgService wg.Tool, iptablesTool ipt.IptablesTool, tcTool tc.Tool, config Configuration) error {
 	wgNetPrefix := netip.MustParsePrefix(fmt.Sprintf("%s/%d", WgServerIp, WgServerMask))
 
-	if err := wgService.CheckWgInterface(WgInfName); err != nil {
+	if err := wgService.CheckWgInterface(wg.ServerParams{
+		InfName:    WgInfName,
+		Ip:         net.ParseIP(WgServerIp),
+		Mask:       net.CIDRMask(WgServerMask, 32),
+		PrivateKey: config.ServerPrivateKey,
+		Port:       config.ServerPort,
+	}); err != nil {
 		return fmt.Errorf("wg interface check failed: %w", err)
 	}
 
-	if err := iptablesTool.CheckWgNatRules(ipt.WgNatParams{
+	if err := iptablesTool.CheckWgNatRules(ipt.NatParams{
 		WgInf:  WgInfName,
 		GwInf:  GwInfName,
 		WgPort: config.ServerPort,
@@ -210,6 +202,17 @@ func ValidateOnce(wgService wg.Tool, iptablesTool ipt.IptablesTool, tcTool tc.To
 
 	if err := tcTool.CheckTcBaseRules(WgInfName, IfbInfName); err != nil {
 		return fmt.Errorf("tc validation failed: %w", err)
+	}
+
+	for i, peer := range config.Peers {
+		if err := wgService.CheckWgPeer(wg.PeerParams{
+			InfName:   WgInfName,
+			Ip:        net.ParseIP(peer.Ip),
+			Mask:      net.CIDRMask(WgPeerMask, 32),
+			PublicKey: config.PeerPublicKey,
+		}); err != nil {
+			return fmt.Errorf("wg peer %d check failed: %w", i, err)
+		}
 	}
 
 	return nil

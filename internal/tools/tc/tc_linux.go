@@ -211,7 +211,7 @@ func (t *Tool) CheckTcBaseRules(wgInf, ifbInf string) error {
 	return nil
 }
 
-type TcPeerParams struct {
+type PeerParams struct {
 	// WgInf is the name of the Wireguard interface (e.g. 'wg0')
 	WgInf string
 	// IfbInf is the name of the IFB interface to be used for ingress shaping (e.g. 'ifb0')
@@ -228,7 +228,7 @@ type TcPeerParams struct {
 
 // ApplyTcForPeer applies traffic control rules for a peer with the given IP address, download speed, and upload speed.
 // It calculates the host number based on the peer's IP and the server's network mask, and then uses that host number to create unique tc rules for that peer.
-func (t *Tool) ApplyTcForPeer(params TcPeerParams) error {
+func (t *Tool) ApplyTcForPeer(params PeerParams) error {
 	hostNum := hostNumber(params.PeerIp, params.ServerNetworkMask)
 
 	//
@@ -293,7 +293,7 @@ func (t *Tool) ApplyTcForPeer(params TcPeerParams) error {
 	return nil
 }
 
-func (t *Tool) CheckTcPeerRules(params TcPeerParams) error {
+func (t *Tool) CheckTcPeerRules(params PeerParams) error {
 	//Check htb class for peer with specified download speed
 	hostNum := hostNumber(params.PeerIp, params.ServerNetworkMask)
 
@@ -317,7 +317,7 @@ func (t *Tool) CheckTcPeerRules(params TcPeerParams) error {
 //
 // - 'peerIp' is the IP address of the peer (e.g. '11.0.0.1')
 // TODO: Actualize
-func DiscardTcForPeer(params TcPeerParams) error {
+func DiscardTcForPeer(params PeerParams) error {
 	hostNum := hostNumber(params.PeerIp, params.ServerNetworkMask)
 
 	_, err := shell.RunExecWithTimeout(fmt.Sprintf("tc filter del dev %s parent 1: prio %v", params.WgInf, hostNum))

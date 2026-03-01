@@ -46,48 +46,50 @@ func main() {
 	configPath := getConfigPathFromArgs()
 	conf, err := config.LoadConfiguration[Configuration](configPath)
 	if err != nil {
-		logrus.Fatal("Failed to load config: ", err.Error())
+		logrus.Fatal("Failed to load config: ", err)
 	}
 
 	// Setup Wg interface
 
-	wgService, err := wg.NewWgTool()
+	wgTool, err := wg.NewTool()
 	if err != nil {
-		logrus.Fatal("Failed to create Tool: ", err.Error())
+		logrus.Fatal("Failed to create Tool: ", err)
 	}
 
-	wgServerIp := net.ParseIP(WgServerIp)
-	wgServerMask := net.CIDRMask(WgServerMask, 32)
-	serverPrivateKey := conf.ServerPrivateKey
-	port := conf.ServerPort
-
-	if err := wgService.AddWgInterface(WgInfName, wgServerIp, wgServerMask, serverPrivateKey, port); err != nil {
-		logrus.Fatal("Failed to setup Wg interface: ", err.Error())
+	if err := wgTool.AddWgInterface(wg.ServerParams{
+		InfName:    WgInfName,
+		Ip:         net.ParseIP(WgServerIp),
+		Mask:       net.CIDRMask(WgServerMask, 32),
+		PrivateKey: conf.ServerPrivateKey,
+		Port:       conf.ServerPort,
+	}); err != nil {
+		logrus.Fatal("Failed to add wg interface: ", err)
 	}
+
 	logrus.Infof("Server enabled")
 
-	// Setup Wg peer
-
-	wgPeerIp := net.ParseIP(WgPeerIp)
-	wgPeerMask := net.CIDRMask(WgPeerMask, 32)
-	peerPublicKey := conf.PeerPublicKey
-
-	if err := wgService.AddWgPeer(WgInfName, wgPeerIp, wgPeerMask, peerPublicKey, nil); err != nil {
-		logrus.Fatal("Failed to add Wg peer: ", err.Error())
+	if err := wgTool.AddWgPeer(wg.PeerParams{
+		InfName:   WgInfName,
+		Ip:        net.ParseIP(WgPeerIp),
+		Mask:      net.CIDRMask(WgPeerMask, 32),
+		PublicKey: conf.PeerPublicKey,
+	}); err != nil {
+		logrus.Fatal("Failed to add wg peer: ", err.Error())
 	}
+
 	logrus.Infof("Peer enabled")
 
 	// Add NAT rules and check them
-	iptablesTool, err := ipt.NewIptablesTool()
+	iptablesTool, err := ipt.NewTool()
 	if err != nil {
 		logrus.Fatal("Failed to create iptables tool: ", err)
 	}
 
 	wgNetPrefix := netip.MustParsePrefix(fmt.Sprintf("%s/%d", WgServerIp, WgServerMask))
-	wgNetParams := ipt.WgNatParams{
+	wgNetParams := ipt.NatParams{
 		WgInf:  WgInfName,
 		GwInf:  GwInfName,
-		WgPort: port,
+		WgPort: conf.ServerPort,
 		WgNet:  wgNetPrefix,
 	}
 

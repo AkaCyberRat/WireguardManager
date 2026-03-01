@@ -14,7 +14,7 @@ type IptablesTool struct {
 	ipt *iptables.IPTables
 }
 
-func NewIptablesTool() (IptablesTool, error) {
+func NewTool() (IptablesTool, error) {
 	var empty IptablesTool
 
 	ipt, err := iptables.New()
@@ -25,8 +25,8 @@ func NewIptablesTool() (IptablesTool, error) {
 	return IptablesTool{ipt: ipt}, nil
 }
 
-// WgNatParams describes parameters for WireGuard NAT rules.
-type WgNatParams struct {
+// NatParams describes parameters for WireGuard NAT rules.
+type NatParams struct {
 	// WgInf is the name of WireGuard interface (e.g. wg0).
 	WgInf string
 	// GwInf is the name of gateway interface (e.g. eth0).
@@ -38,7 +38,7 @@ type WgNatParams struct {
 }
 
 // AddWgNatRules turns on ipt (legacy) NAT for packets forwarding between interfaces.
-func (t *IptablesTool) AddWgNatRules(params WgNatParams) error {
+func (t *IptablesTool) AddWgNatRules(params NatParams) error {
 	rules := wgNatRules(params)
 	return t.addRules(rules)
 }
@@ -53,7 +53,7 @@ func (t *IptablesTool) AddDnsWgNatRules(wgInf string) error {
 
 // CheckWgNatRules checks ipt (legacy) NAT rules existence.
 // Returns nil if all rules exist, returns ErrNotExist if any rule does not exist, otherwise returns an error.
-func (t *IptablesTool) CheckWgNatRules(params WgNatParams) error {
+func (t *IptablesTool) CheckWgNatRules(params NatParams) error {
 	rules := wgNatRules(params)
 	return t.checkRules(rules)
 }
@@ -69,7 +69,7 @@ func (t *IptablesTool) CheckWgDnsNatRules(wgInf string) error {
 }
 
 // DeleteWgNat delete ipt (legacy) NAT rules if exists.
-func (t *IptablesTool) DeleteWgNat(params WgNatParams) error {
+func (t *IptablesTool) DeleteWgNat(params NatParams) error {
 	rules := wgNatRules(params)
 	return t.deleteRules(rules)
 }
@@ -132,7 +132,7 @@ func (t *IptablesTool) deleteRules(rules []string) error {
 	return nil
 }
 
-func wgNatRules(params WgNatParams) []string {
+func wgNatRules(params NatParams) []string {
 	return []string{
 		// NAT for wg interface
 		fmt.Sprintf("-t nat -A POSTROUTING -s %v -o %v -j MASQUERADE", params.WgNet, params.GwInf),

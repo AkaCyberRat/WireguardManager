@@ -17,7 +17,7 @@ type Tool struct {
 	client *wgctrl.Client
 }
 
-func NewWgTool() (Tool, error) {
+func NewTool() (Tool, error) {
 	client, err := wgctrl.New()
 	if err != nil {
 		return Tool{}, err
@@ -106,7 +106,7 @@ func (t *Tool) AddWgInterface(params ServerParams) error {
 func (t *Tool) CheckWgInterface(params ServerParams) error {
 	_, err := t.client.Device(params.InfName)
 	if errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("wireguard interface %t %w", params.InfName, tools.ErrNotExist)
+		return fmt.Errorf("wireguard interface '%s' %w", params.InfName, tools.ErrNotExist)
 	}
 
 	return err
@@ -150,11 +150,9 @@ func (t *Tool) AddWgPeer(params PeerParams) error {
 	return t.client.ConfigureDevice(params.InfName, wgtypes.Config{Peers: []wgtypes.PeerConfig{peer}})
 }
 
-type CheckPeerParams PeerParams
-
 // CheckWgPeer check a peer existence for the wireguard interface with the given parameters.
 // Returns nil if the peer exists, returns ErrNotExist if not exist, otherwise returns an error.
-func (t *Tool) CheckWgPeer(params CheckPeerParams) error {
+func (t *Tool) CheckWgPeer(params PeerParams) error {
 	device, err := t.client.Device(params.InfName)
 	if err != nil {
 		return err
