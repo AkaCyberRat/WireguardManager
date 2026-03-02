@@ -1,48 +1,51 @@
 package manager
 
 import (
-	"fmt"
+	"WireguardManager/internal/tools"
+	"WireguardManager/internal/tools/ipt"
+	"WireguardManager/internal/tools/tc"
+	"WireguardManager/internal/tools/wg"
+
+	"github.com/sirupsen/logrus"
 )
 
 type Manager struct {
-	taskChan    chan task
+	wgTool      wg.Tool
+	tcTool      tc.Tool
+	iptTool     ipt.Tool
+	taskChan    chan ExecutableTask[taskContext]
 	closingChan chan struct{}
 }
 
 func NewManager() (Manager, error) {
+	var empty Manager
 
-	return Manager{}, nil
-}
-
-// Use[T] возвращает <-chan Result[T] для вызывающей стороны
-func Use[T any](m *Manager, c Command) <-chan Result[T] {
-	resultCh := make(chan Result[T], 1)
-	t := task{
-		command: c,
-		handle:  make(chan any, 1),
+	wgTool, err := wg.NewTool()
+	if err != nil {
+		return empty, tools.FailedToCreateTool("wg", err)
 	}
 
-	select {
-	case m.taskChan <- t:
-		go func() {
-			defer close(resultCh)
-
-			v := <-t.handle
-			if r, ok := v.(Result[T]); ok {
-				resultCh <- r
-				return
-			}
-
-			resultCh <- Result[T]{Error: fmt.Errorf("unexpected result type")}
-		}()
-
-	case <-m.closingChan:
-		var zero T
-		resultCh <- Result[T]{Ok: zero, Error: fmt.Errorf("manager closed")}
-		close(resultCh)
+	tcTool, err := tc.NewTool()
+	if err != nil {
+		return empty, tools.FailedToCreateTool("tc", err)
 	}
 
-	return resultCh
+	iptTool, err := ipt.NewTool()
+	if err != nil {
+		return empty, tools.FailedToCreateTool("ipt", err)
+	}
+
+	manager := Manager{
+		wgTool:      wgTool,
+		tcTool:      tcTool,
+		iptTool:     iptTool,
+		taskChan:    make(chan ExecutableTask[taskContext], 1),
+		closingChan: make(chan struct{}),
+	}
+
+	go manager.managerWorker()
+
+	return manager, nil
 }
 
 func (m *Manager) Close() {
@@ -50,32 +53,24 @@ func (m *Manager) Close() {
 	close(m.taskChan)
 }
 
-func managerWorker() {}
+func (m *Manager) managerWorker() {
+	ctx := taskContext{
+		Field: 1,
+	}
 
-// Helpers
+	for {
+		select {
+		case task := <-m.taskChan:
+			// TODO: Add timout
+			task.Execute(ctx)
 
-type task struct {
-	command Command
-	handle  chan any
+		case <-m.closingChan:
+			logrus.Info("Manager worker finished")
+			return
+		}
+	}
 }
 
-type Command struct {
-	Params any
-	Type   CommandType
-}
-
-type CommandType int
-
-const (
-	UpdateServerCommand CommandType = iota
-	CheckServerCommand
-	AddPeerCommand
-	UpdatePeerCommand
-	CheckPeerCommand
-	RemovePeerCommand
-)
-
-type Result[T any] struct {
-	Ok    T
-	Error error
+type taskContext struct {
+	Field int
 }

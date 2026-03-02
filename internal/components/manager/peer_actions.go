@@ -8,15 +8,21 @@ type Peer struct{}
 
 type AddPeerParams struct{}
 
-func (m *Manager) AddPeer(ctx context.Context, params AddPeerParams) <-chan Result[Peer] {
-	return Use[Peer](m, Command{Params: params, Type: AddPeerCommand})
+func (m *Manager) AddPeerAsync(ctx context.Context, params AddPeerParams) <-chan Result[Peer] {
+	task := NewGenericTask(AddPeerParams{}, addPeerTask)
+
+	return task.WaitAsync()
+}
+
+func addPeerTask(params AddPeerParams, resultCh chan<- Result[Peer], ctx taskContext) {
+
 }
 
 // Update peer
 
 type UpdatePeerParams struct{}
 
-func (m *Manager) UpdatePeer(ctx context.Context, params UpdatePeerParams) <-chan Result[Peer]
+func (m *Manager) UpdatePeer(ctx context.Context, params UpdatePeerParams) Result[Peer]
 
 // Check peer
 
