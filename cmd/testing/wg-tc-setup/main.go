@@ -155,7 +155,7 @@ func main() {
 
 }
 
-func StartTimedValidator(ctx context.Context, interval time.Duration, wgService wg.Tool, iptablesTool ipt.IptablesTool, tcTool tc.Tool, config Configuration) {
+func StartTimedValidator(ctx context.Context, interval time.Duration, wgService wg.Tool, iptablesTool ipt.Tool, tcTool tc.Tool, config Configuration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
@@ -178,7 +178,7 @@ func StartTimedValidator(ctx context.Context, interval time.Duration, wgService 
 	}
 }
 
-func Validate(wgService wg.Tool, iptablesTool ipt.IptablesTool, tcTool tc.Tool, config Configuration) error {
+func Validate(wgService wg.Tool, iptablesTool ipt.Tool, tcTool tc.Tool, config Configuration) error {
 	wgNetPrefix := netip.MustParsePrefix(fmt.Sprintf("%s/%d", WgServerIp, WgServerMask))
 
 	if err := wgService.CheckWgInterface(wg.ServerParams{

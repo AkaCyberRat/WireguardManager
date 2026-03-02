@@ -10,19 +10,19 @@ import (
 )
 
 // Tool that allow to manage legacy iptables rules(currently for local NAT).
-type IptablesTool struct {
+type Tool struct {
 	ipt *iptables.IPTables
 }
 
-func NewTool() (IptablesTool, error) {
-	var empty IptablesTool
+func NewTool() (Tool, error) {
+	var empty Tool
 
 	ipt, err := iptables.New()
 	if err != nil {
 		return empty, err
 	}
 
-	return IptablesTool{ipt: ipt}, nil
+	return Tool{ipt: ipt}, nil
 }
 
 // NatParams describes parameters for WireGuard NAT rules.
@@ -38,7 +38,7 @@ type NatParams struct {
 }
 
 // AddWgNatRules turns on ipt (legacy) NAT for packets forwarding between interfaces.
-func (t *IptablesTool) AddWgNatRules(params NatParams) error {
+func (t *Tool) AddWgNatRules(params NatParams) error {
 	rules := wgNatRules(params)
 	return t.addRules(rules)
 }
@@ -46,14 +46,14 @@ func (t *IptablesTool) AddWgNatRules(params NatParams) error {
 // AddDnsWgNatRules turns on ipt (legacy) NAT for packets forwarding between interfaces.
 //
 // - 'wgInf' 	is the name of wg interface (e.g. wg0)
-func (t *IptablesTool) AddDnsWgNatRules(wgInf string) error {
+func (t *Tool) AddDnsWgNatRules(wgInf string) error {
 	rules := wgDnsNatRules(wgInf)
 	return t.addRules(rules)
 }
 
 // CheckWgNatRules checks ipt (legacy) NAT rules existence.
 // Returns nil if all rules exist, returns ErrNotExist if any rule does not exist, otherwise returns an error.
-func (t *IptablesTool) CheckWgNatRules(params NatParams) error {
+func (t *Tool) CheckWgNatRules(params NatParams) error {
 	rules := wgNatRules(params)
 	return t.checkRules(rules)
 }
@@ -63,13 +63,13 @@ func (t *IptablesTool) CheckWgNatRules(params NatParams) error {
 // - 'wgInf' 	is the name of wg interface (e.g. wg0)
 //
 // Returns nil if all rules exist, returns ErrNotExist if any rule does not exist, otherwise returns an error.
-func (t *IptablesTool) CheckWgDnsNatRules(wgInf string) error {
+func (t *Tool) CheckWgDnsNatRules(wgInf string) error {
 	rules := wgDnsNatRules(wgInf)
 	return t.checkRules(rules)
 }
 
 // DeleteWgNat delete ipt (legacy) NAT rules if exists.
-func (t *IptablesTool) DeleteWgNat(params NatParams) error {
+func (t *Tool) DeleteWgNat(params NatParams) error {
 	rules := wgNatRules(params)
 	return t.deleteRules(rules)
 }
@@ -77,12 +77,12 @@ func (t *IptablesTool) DeleteWgNat(params NatParams) error {
 // DeleteDnsWgNat delete ipt (legacy) NAT rules if exists.
 //
 // - 'wgInf' 	is the name of wg interface (e.g. wg0)
-func (t *IptablesTool) DeleteDnsWgNat(wgInf string) error {
+func (t *Tool) DeleteDnsWgNat(wgInf string) error {
 	rules := wgDnsNatRules(wgInf)
 	return t.deleteRules(rules)
 }
 
-func (t *IptablesTool) addRules(rules []string) error {
+func (t *Tool) addRules(rules []string) error {
 	for _, rule := range rules {
 		args, err := shlex.Split(rule)
 		if err != nil {
@@ -97,7 +97,7 @@ func (t *IptablesTool) addRules(rules []string) error {
 	return nil
 }
 
-func (t *IptablesTool) checkRules(rules []string) error {
+func (t *Tool) checkRules(rules []string) error {
 	for _, rule := range rules {
 		args, err := shlex.Split(rule)
 		if err != nil {
@@ -117,7 +117,7 @@ func (t *IptablesTool) checkRules(rules []string) error {
 	return nil
 }
 
-func (t *IptablesTool) deleteRules(rules []string) error {
+func (t *Tool) deleteRules(rules []string) error {
 	for _, rule := range rules {
 		args, err := shlex.Split(rule)
 		if err != nil {
