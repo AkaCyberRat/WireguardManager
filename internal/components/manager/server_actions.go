@@ -2,6 +2,12 @@ package manager
 
 type Server struct{}
 
+// Create server
+
+type CreateServerParams struct{}
+
+func (m *Manager) createServer(params UpdatePeerParams) <-chan Result[Server]
+
 // Update server
 
 type UpdateServerParams struct{}

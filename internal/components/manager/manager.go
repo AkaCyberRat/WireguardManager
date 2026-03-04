@@ -5,6 +5,8 @@ import (
 	"WireguardManager/internal/tools/ipt"
 	"WireguardManager/internal/tools/tc"
 	"WireguardManager/internal/tools/wg"
+	"context"
+	"fmt"
 
 	"github.com/sirupsen/logrus"
 )
@@ -55,7 +57,9 @@ func (m *Manager) Close() {
 
 func (m *Manager) managerWorker() {
 	ctx := taskContext{
-		Field: 1,
+		WgTool:  m.wgTool,
+		TcTool:  m.tcTool,
+		IptTool: m.iptTool,
 	}
 
 	for {
@@ -71,6 +75,30 @@ func (m *Manager) managerWorker() {
 	}
 }
 
-type taskContext struct {
-	Field int
+func (m *Manager) sendTask(ctx context.Context, task ExecutableTask[taskContext]) error {
+	select {
+	case <-ctx.Done():
+		return ErrorSendCanceled
+	case m.taskChan <- task:
+		return nil
+	}
 }
+
+func executeTaskAsync[TParams any, TOut any](m *Manager, ctx context.Context, params TParams, execFunc TaskFunc[TParams, TOut, taskContext]) <-chan Result[TOut] {
+	task := NewGenericTask(params, execFunc)
+
+	err := m.sendTask(ctx, &task)
+	if err != nil {
+		task.Fail(err)
+	}
+
+	return task.WaitAsync()
+}
+
+type taskContext struct {
+	WgTool  wg.Tool
+	TcTool  tc.Tool
+	IptTool ipt.Tool
+}
+
+var ErrorSendCanceled = fmt.Errorf("task sending was canceled by context")

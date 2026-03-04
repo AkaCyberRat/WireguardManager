@@ -1,21 +1,30 @@
 package manager
 
-import "context"
+import (
+	"WireguardManager/internal/tools/wg"
+	"context"
+	"net"
+)
 
 type Peer struct{}
 
 // Add peer
 
-type AddPeerParams struct{}
+type AddPeerParams struct {
+	// Ip is the IP address of peer (e.g. '11.0.0.2')
+	Ip net.IP
+	// PublicKey is the public key of peer
+	PublicKey string
+	// PreSharedKey is the pre-shared key of peer (optional)
+	PreSharedKey *string
+}
 
 func (m *Manager) AddPeerAsync(ctx context.Context, params AddPeerParams) <-chan Result[Peer] {
-	task := NewGenericTask(AddPeerParams{}, addPeerTask)
-
-	return task.WaitAsync()
+	return executeTaskAsync(m, ctx, params, addPeerTask)
 }
 
 func addPeerTask(params AddPeerParams, resultCh chan<- Result[Peer], ctx taskContext) {
-
+	ctx.WgTool.AddWgPeer(wg.PeerParams{})
 }
 
 // Update peer
